@@ -1,6 +1,6 @@
 import "server-only";
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { env } from "../env";
+import { decodeKey, env } from "../env";
 
 /** 256-bit URL-safe random token. */
 export function randomToken(bytes = 32): string {
@@ -18,7 +18,7 @@ export function safeEqual(a: string, b: string): boolean {
 }
 
 function key(): Buffer {
-  return Buffer.from(env().DATA_ENCRYPTION_KEY, "base64");
+  return decodeKey(env().DATA_ENCRYPTION_KEY)!;
 }
 
 /** AES-256-GCM. Output: v1.<iv>.<tag>.<ciphertext>, all base64url. */
