@@ -15,7 +15,7 @@ Acceptance: users sign in securely, switch between authorised firms, manage lead
 - [x] Group Command Centre and firm dashboards from real data
 - [x] Audit log (append-only) at organisation and firm level
 - [x] Service catalogue loaded from the approved fee schedule (Veritas, Mimshac)
-- [x] 37 unit/integration tests, 7 end-to-end tests with accessibility checks
+- [x] 42 unit/integration tests, 7 end-to-end tests with accessibility checks, independent security review
 
 ## Release 2 — Proposals: **Next**
 Acceptance: a lead moves through a real proposal workflow and becomes a client.

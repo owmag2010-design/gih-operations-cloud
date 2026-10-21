@@ -26,7 +26,7 @@ npm run dev
 
 ## Tests
 ```bash
-npm test            # 37 unit and integration tests (database: gih_test)
+npm test            # 42 unit and integration tests (database: gih_test)
 npm run test:e2e    # 7 end-to-end tests incl. accessibility (database: gih_e2e)
 npm run lint && npm run typecheck
 ```
