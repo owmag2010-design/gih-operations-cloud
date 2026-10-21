@@ -81,6 +81,14 @@ describe("authentication", () => {
     await expect(beginMfaEnrolment(u.user.id, u.user.email)).rejects.toThrow(/already enabled/);
   });
 
+  it("shows the same pending secret when set-up is started again", async () => {
+    const u = await makeUser({ firms: { veritas: "firm_admin" } });
+    const first = await beginMfaEnrolment(u.user.id, u.user.email);
+    const second = await beginMfaEnrolment(u.user.id, u.user.email);
+    expect(second.secret).toBe(first.secret);
+    expect(await confirmMfaEnrolment(u.user.id, await generate({ secret: first.secret }))).toHaveLength(10);
+  });
+
   it("expires sessions after the absolute lifetime", async () => {
     const u = await makeUser({ firms: { veritas: "reviewer" } });
     const { token, id } = await createSession(u.user.id, { mfaVerified: true });

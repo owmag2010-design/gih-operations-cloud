@@ -10,10 +10,27 @@ const ISSUER = "GIH Operations Cloud";
 
 /** Start enrolment: store a new pending secret and return what the authenticator app needs. */
 export async function beginMfaEnrolment(userId: string, email: string) {
-  const [u] = await db().select({ enabled: users.mfaEnabledAt }).from(users).where(eq(users.id, userId)).limit(1);
+  const [u] = await db()
+    .select({ enabled: users.mfaEnabledAt, pending: users.mfaSecretEnc })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
   if (u?.enabled) throw new Error("MFA is already enabled; disable it first.");
-  const secret = generateSecret();
-  await db().update(users).set({ mfaSecretEnc: encrypt(secret), mfaEnabledAt: null, mfaLastTimeStep: null }).where(eq(users.id, userId));
+  // Reuse a pending secret so pressing "Set up" again (or reloading) shows the
+  // same QR code. Otherwise the entry already scanned into the authenticator
+  // app stops matching and every code is rejected.
+  let secret: string | null = null;
+  if (u?.pending) {
+    try {
+      secret = decrypt(u.pending);
+    } catch {
+      secret = null; // encrypted under an old key: start over
+    }
+  }
+  if (!secret) {
+    secret = generateSecret();
+    await db().update(users).set({ mfaSecretEnc: encrypt(secret), mfaEnabledAt: null, mfaLastTimeStep: null }).where(eq(users.id, userId));
+  }
   return { secret, uri: generateURI({ issuer: ISSUER, label: email, secret }) };
 }
 
