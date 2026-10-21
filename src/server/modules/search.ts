@@ -39,7 +39,7 @@ export async function globalSearch(ctx: AccessContext, raw: string): Promise<Sea
           )
           .orderBy(desc(leads.updatedAt))
           .limit(8);
-        for (const r of rows) hits.push({ kind: "lead", id: r.id, title: full(r.firstName, r.lastName), subtitle: `${r.ref} · ${firmName(r.firmId)}${r.email ? ` · ${r.email}` : ""}`, href: `/f/${slug(r.firmId)}/leads/${r.id}` });
+        for (const r of rows) hits.push({ kind: "lead", id: r.id, title: full(r.firstName, r.lastName), subtitle: [r.ref, firmName(r.firmId), r.email].filter(Boolean).join(", "), href: `/f/${slug(r.firmId)}/leads/${r.id}` });
       }
       if (clientAll.length || clientOwn.length) {
         const rows = await tx
@@ -57,7 +57,7 @@ export async function globalSearch(ctx: AccessContext, raw: string): Promise<Sea
           )
           .orderBy(desc(clients.updatedAt))
           .limit(8);
-        for (const r of rows) hits.push({ kind: "client", id: r.id, title: full(r.firstName, r.lastName), subtitle: `${r.ref} · ${firmName(r.firmId)}${r.email ? ` · ${r.email}` : ""}`, href: `/f/${slug(r.firmId)}/clients/${r.id}` });
+        for (const r of rows) hits.push({ kind: "client", id: r.id, title: full(r.firstName, r.lastName), subtitle: [r.ref, firmName(r.firmId), r.email].filter(Boolean).join(", "), href: `/f/${slug(r.firmId)}/clients/${r.id}` });
       }
     });
   }
@@ -71,7 +71,7 @@ export async function globalSearch(ctx: AccessContext, raw: string): Promise<Sea
         .orderBy(desc(intakeItems.receivedAt))
         .limit(6),
     );
-    for (const r of rows) hits.push({ kind: "enquiry", id: r.id, title: full(r.firstName, r.lastName), subtitle: `Hub enquiry · ${r.status}${r.email ? ` · ${r.email}` : ""}`, href: `/hq/intake/${r.id}` });
+    for (const r of rows) hits.push({ kind: "enquiry", id: r.id, title: full(r.firstName, r.lastName), subtitle: ["Hub enquiry", r.status, r.email].filter(Boolean).join(", "), href: `/hq/intake/${r.id}` });
   }
   return hits;
 }
