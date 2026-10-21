@@ -40,3 +40,14 @@ npm run lint && npm run typecheck
 - [ ] Monitoring (uptime on `/api/health`, error tracking) in place
 - [ ] Operational acceptance test by a consultant in each firm
 - [ ] Known-limitations register reviewed and accepted
+
+## Live setup (21 Oct 2026)
+| Item | Value |
+|---|---|
+| Database | Supabase project `gih-operations-cloud` (ref `hwcofcngqgtsqqkojdzg`), org "Global Immigration Hub" (Pro), region Sydney `ap-southeast-2` |
+| App database login | `gih_app` (login, no BYPASSRLS, not superuser), via the transaction pooler on port 6543 |
+| Owner connection | GitHub repository secret `MIGRATION_DATABASE_URL` (session pooler, port 5432); used only by the Database workflow |
+| Hosting | Vercel team `gih-operations-cloud`, project `gih-operations-cloud-7qm1`, functions pinned to `syd1` (`vercel.json`) |
+| Address | https://gih-operations-cloud-7qm1.vercel.app (custom domain to follow) |
+| Vercel variables | `APP_URL`, `DATABASE_URL`, `DATA_ENCRYPTION_KEY`, `INTAKE_WEBHOOK_SECRET` (Production) |
+| Migrations and seed | Database workflow run #2, `migrate-and-seed`, succeeded |
