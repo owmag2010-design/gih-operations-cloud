@@ -1,0 +1,173 @@
+/**
+ * Permission catalogue. Roles in the database hold lists of these keys.
+ * See docs/04-roles-and-permissions.md.
+ */
+
+export const GROUP_PERMISSIONS = [
+  "org:manage",
+  "firms:view",
+  "firms:create",
+  "firms:edit",
+  "staff:view",
+  "staff:invite",
+  "staff:manage",
+  "roles:manage",
+  "intake:view",
+  "intake:create",
+  "intake:route",
+  "routing:manage",
+  "metrics:group",
+  "audit:view",
+] as const;
+
+export const FIRM_PERMISSIONS = [
+  "firm:view",
+  "firm:manage",
+  "team:view",
+  "team:invite",
+  "team:manage",
+  "leads:view_all",
+  "leads:view_assigned",
+  "leads:create",
+  "leads:edit",
+  "leads:delete",
+  "leads:assign",
+  "leads:convert",
+  "leads:export",
+  "clients:view_all",
+  "clients:view_assigned",
+  "clients:create",
+  "clients:edit",
+  "clients:export",
+  "metrics:firm",
+  "audit:firm",
+] as const;
+
+export type GroupPermission = (typeof GROUP_PERMISSIONS)[number];
+export type FirmPermission = (typeof FIRM_PERMISSIONS)[number];
+export type Permission = GroupPermission | FirmPermission;
+
+export const PERMISSION_LABELS: Record<Permission, string> = {
+  "org:manage": "Manage organisation settings and offices",
+  "firms:view": "View firms",
+  "firms:create": "Create firms",
+  "firms:edit": "Edit firm profiles and policies",
+  "staff:view": "View staff",
+  "staff:invite": "Invite staff",
+  "staff:manage": "Manage staff roles and access",
+  "roles:manage": "Manage roles",
+  "intake:view": "View Hub intake",
+  "intake:create": "Capture Hub enquiries",
+  "intake:route": "Route Hub enquiries to firms",
+  "routing:manage": "Manage routing rules",
+  "metrics:group": "View group metrics",
+  "audit:view": "View organisation audit log",
+  "firm:view": "Open the firm workspace",
+  "firm:manage": "Manage firm settings and pipeline",
+  "team:view": "View firm team",
+  "team:invite": "Invite to the firm",
+  "team:manage": "Manage firm team roles",
+  "leads:view_all": "View all leads",
+  "leads:view_assigned": "View assigned leads only",
+  "leads:create": "Create leads",
+  "leads:edit": "Edit leads",
+  "leads:delete": "Delete leads",
+  "leads:assign": "Assign leads",
+  "leads:convert": "Convert leads to clients",
+  "leads:export": "Export leads",
+  "clients:view_all": "View all clients",
+  "clients:view_assigned": "View assigned clients only",
+  "clients:create": "Create clients",
+  "clients:edit": "Edit clients",
+  "clients:export": "Export clients",
+  "metrics:firm": "View firm metrics",
+  "audit:firm": "View firm audit log",
+};
+
+export function isGroupPermission(p: string): p is GroupPermission {
+  return (GROUP_PERMISSIONS as readonly string[]).includes(p);
+}
+export function isFirmPermission(p: string): p is FirmPermission {
+  return (FIRM_PERMISSIONS as readonly string[]).includes(p);
+}
+
+type RoleDef = { key: string; name: string; scope: "group" | "firm" | "portal"; description: string; permissions: Permission[] };
+
+export const DEFAULT_ROLES: RoleDef[] = [
+  {
+    key: "group_super_admin",
+    name: "Group Super Administrator",
+    scope: "group",
+    description: "Runs the Hub: firms, staff, routing, intake, metrics and audit. Sees firm records only through a firm membership.",
+    permissions: [...GROUP_PERMISSIONS],
+  },
+  {
+    key: "group_ops_admin",
+    name: "Group Operations Administrator",
+    scope: "group",
+    description: "Triages Hub enquiries and watches group metrics.",
+    permissions: ["firms:view", "staff:view", "intake:view", "intake:create", "intake:route", "metrics:group", "audit:view"],
+  },
+  {
+    key: "firm_admin",
+    name: "Firm Administrator",
+    scope: "firm",
+    description: "Full control of one firm's workspace, team and settings.",
+    permissions: [...FIRM_PERMISSIONS],
+  },
+  {
+    key: "immigration_consultant",
+    name: "Immigration Consultant",
+    scope: "firm",
+    description: "Works leads through to clients.",
+    permissions: [
+      "firm:view", "team:view", "leads:view_all", "leads:create", "leads:edit", "leads:assign",
+      "leads:convert", "clients:view_all", "clients:create", "clients:edit", "metrics:firm",
+    ],
+  },
+  {
+    key: "case_manager",
+    name: "Case Manager",
+    scope: "firm",
+    description: "Manages client matters.",
+    permissions: ["firm:view", "team:view", "leads:view_all", "leads:edit", "clients:view_all", "clients:edit", "metrics:firm"],
+  },
+  {
+    key: "reviewer",
+    name: "Reviewer",
+    scope: "firm",
+    description: "Reviews work; read access.",
+    permissions: ["firm:view", "leads:view_all", "clients:view_all"],
+  },
+  {
+    key: "document_officer",
+    name: "Document Officer",
+    scope: "firm",
+    description: "Handles client documents (Release 4).",
+    permissions: ["firm:view", "clients:view_all"],
+  },
+  {
+    key: "finance_officer",
+    name: "Finance Officer",
+    scope: "firm",
+    description: "Billing and payments (Release 6).",
+    permissions: ["firm:view", "clients:view_all", "metrics:firm"],
+  },
+  {
+    key: "support_officer",
+    name: "Support Officer",
+    scope: "firm",
+    description: "Captures enquiries and supports assigned records.",
+    permissions: ["firm:view", "leads:view_assigned", "leads:create", "clients:view_assigned"],
+  },
+  {
+    key: "client",
+    name: "Client",
+    scope: "portal",
+    description: "Client portal user (Release 4). No staff access.",
+    permissions: [],
+  },
+];
+
+/** Roles that must have MFA regardless of firm policy. */
+export const MFA_MANDATORY_ROLE_KEYS = new Set(["group_super_admin", "group_ops_admin", "firm_admin"]);
