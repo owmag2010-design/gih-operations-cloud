@@ -1,14 +1,15 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import QRCode from "qrcode";
 import { loadAccessContext } from "@/server/access/context";
 import { audit } from "@/server/audit";
 import { beginMfaEnrolment, confirmMfaEnrolment, disableMfa, verifyMfa } from "@/server/auth/mfa";
 import { verifyPassword } from "@/server/auth/password";
 import { acceptInvitation, changePassword, requestPasswordReset, resetPassword, signIn } from "@/server/auth/service";
-import { deleteSession, markSessionMfaVerified } from "@/server/auth/sessions";
-import { assertNotThrottled, recordAttempt } from "@/server/auth/throttle";
+import { deleteSession, deleteUserSessions, markSessionMfaVerified } from "@/server/auth/sessions";
+import { beginAttempt, finishAttempt } from "@/server/auth/throttle";
 import { db } from "@/server/db/client";
 import { users } from "@/server/db/schema";
 import { toActionError, type ActionResult } from "@/server/errors";
@@ -35,9 +36,9 @@ export async function mfaChallengeAction(_: ActionResult | null, form: FormData)
   if (!session) redirect("/login");
   const { ip } = await requestMeta();
   try {
-    await assertNotThrottled("mfa", session.user.email, ip);
+    const attempt = await beginAttempt("mfa", session.user.email, ip);
     const { ok, usedRecoveryCode } = await verifyMfa(session.userId, str(form, "code"));
-    await recordAttempt("mfa", session.user.email, ip, ok);
+    await finishAttempt(attempt, ok);
     if (!ok) return { ok: false, error: "That code didn't work. Check your authenticator app and try again." };
     await markSessionMfaVerified(session.id);
     await audit({ orgId: session.user.orgId, actorId: session.userId, action: usedRecoveryCode ? "auth.mfa_recovery_code_used" : "auth.mfa_verified", entityType: "user", entityId: session.userId, ip });
@@ -61,7 +62,9 @@ export async function acceptInvitationAction(token: string, _: ActionResult | nu
   const meta = await requestMeta();
   const session = await currentSession();
   try {
-    const result = await acceptInvitation({ token, name: str(form, "name"), password: str(form, "password"), signedInUserId: session?.userId ?? null, ...meta });
+    // An existing account counts as signed in only once its two-step check is complete.
+    const verified = session && (!session.user.mfaEnabled || session.mfaVerified) ? session.userId : null;
+    const result = await acceptInvitation({ token, name: str(form, "name"), password: str(form, "password"), signedInUserId: verified, ...meta });
     if (result.session) await setSessionCookie(result.session.token, result.session.expiresAt);
   } catch (err) {
     return toActionError(err);
@@ -71,11 +74,15 @@ export async function acceptInvitationAction(token: string, _: ActionResult | nu
 
 export async function requestResetAction(_: ActionResult | null, form: FormData): Promise<ActionResult> {
   const { ip } = await requestMeta();
-  try {
-    await requestPasswordReset(str(form, "email"), ip);
-  } catch (err) {
-    return toActionError(err);
-  }
+  const email = str(form, "email");
+  // Done after the response so a real account and an unknown address take the same time.
+  after(async () => {
+    try {
+      await requestPasswordReset(email, ip);
+    } catch (err) {
+      if (!(err instanceof Error && err.name === "RateLimitedError")) console.error("[password reset]", err instanceof Error ? err.name : "error");
+    }
+  });
   return { ok: true, message: "If that address belongs to an account, a reset link is on its way. It expires in one hour." };
 }
 
@@ -109,16 +116,24 @@ export async function confirmMfaAction(_: ActionResult<{ codes: string[] }> | nu
   const codes = await confirmMfaEnrolment(ctx.user.id, str(form, "code").replace(/\s+/g, ""));
   if (!codes) return { ok: false, error: "That code didn't match. Wait for the next code and try again." };
   await markSessionMfaVerified(session.id);
+  await deleteUserSessions(ctx.user.id, session.id);
   await audit({ orgId: ctx.orgId, actorId: ctx.user.id, action: "auth.mfa_enabled", entityType: "user", entityId: ctx.user.id, ip: ctx.ip });
   return { ok: true, data: { codes }, message: "Two-step sign-in is on." };
 }
 
 export async function disableMfaAction(_: ActionResult | null, form: FormData): Promise<ActionResult> {
   const { ctx } = await requireStaff();
-  const [u] = await db().select({ hash: users.passwordHash }).from(users).where(eq(users.id, ctx.user.id));
-  if (!(await verifyPassword(u?.hash ?? null, str(form, "password")))) return { ok: false, error: "Your password is incorrect." };
   const { isMfaMandatory } = await import("@/server/auth/service");
   if (await isMfaMandatory(ctx)) return { ok: false, error: "Your role requires two-step sign-in, so it can't be turned off." };
+  try {
+    const attempt = await beginAttempt("password", ctx.user.email, ctx.ip);
+    const [u] = await db().select({ hash: users.passwordHash }).from(users).where(eq(users.id, ctx.user.id));
+    if (!(await verifyPassword(u?.hash ?? null, str(form, "password")))) return { ok: false, error: "Your password is incorrect." };
+    if (!(await verifyMfa(ctx.user.id, str(form, "code"))).ok) return { ok: false, error: "That code didn't work." };
+    await finishAttempt(attempt, true);
+  } catch (err) {
+    return toActionError(err);
+  }
   await disableMfa(ctx.user.id);
   await audit({ orgId: ctx.orgId, actorId: ctx.user.id, action: "auth.mfa_disabled", entityType: "user", entityId: ctx.user.id, ip: ctx.ip });
   return { ok: true, message: "Two-step sign-in is off." };

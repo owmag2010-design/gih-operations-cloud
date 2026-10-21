@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { generateSecret, generateURI, verify } from "otplib";
 import { db } from "../db/client";
 import { mfaRecoveryCodes, users } from "../db/schema";
@@ -27,10 +27,15 @@ async function checkCode(userId: string, code: string): Promise<boolean> {
   const result = await verify({ secret: decrypt(u.secret), token: code, epochTolerance: 30 });
   if (!result.valid) return false;
   const step = "timeStep" in result && typeof result.timeStep === "number" ? result.timeStep : null;
-  // Refuse a code from the same or an earlier time step than the last accepted one (replay).
-  if (step !== null && u.lastStep !== null && step <= u.lastStep) return false;
-  if (step !== null) await db().update(users).set({ mfaLastTimeStep: step }).where(eq(users.id, userId));
-  return true;
+  if (step === null) return false;
+  // Accept each time step once. The conditional update is atomic, so two
+  // simultaneous submissions of the same code can't both succeed.
+  const claimed = await db()
+    .update(users)
+    .set({ mfaLastTimeStep: step })
+    .where(and(eq(users.id, userId), or(isNull(users.mfaLastTimeStep), lt(users.mfaLastTimeStep, step))))
+    .returning({ id: users.id });
+  return claimed.length > 0;
 }
 
 /** Confirm enrolment with a first code. Returns one-time recovery codes to show once. */

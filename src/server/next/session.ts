@@ -18,11 +18,18 @@ export async function clearSessionCookie() {
   (await cookies()).delete(SESSION_COOKIE());
 }
 
-/** Client IP and user agent for auditing and throttling. Trusts the platform's forwarded header. */
+/**
+ * Client IP and user agent for auditing and throttling.
+ * Uses headers set by the hosting platform (Vercel's own header first). From a
+ * plain X-Forwarded-For it takes the right-most entry, the one added by the
+ * nearest proxy, because left-hand entries can be supplied by the client.
+ */
 export async function requestMeta() {
   const h = await headers();
-  const fwd = h.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return { ip: fwd || h.get("x-real-ip") || null, userAgent: h.get("user-agent") };
+  const platform = h.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip")?.trim();
+  const fwd = h.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean).at(-1);
+  const ip = (platform || fwd || "").slice(0, 64) || null;
+  return { ip, userAgent: h.get("user-agent") };
 }
 
 /** The raw session for this request (memoised per render). */

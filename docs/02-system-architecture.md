@@ -74,3 +74,4 @@ Hosting target: Vercel (Node runtime) plus managed PostgreSQL (Neon, Supabase or
 - MFA secrets encrypted at rest with AES-256-GCM using a key from the environment.
 - Audit table is insert-only for the application role.
 - Content Security Policy, frame denial, referrer and permissions policies set in `proxy.ts`.
+- Row-level security trusts the `app.*` settings the application sets in each transaction. It defends against application bugs (a missing filter), not against someone holding the application's database credential. That credential is therefore treated as highly sensitive.

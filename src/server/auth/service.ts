@@ -1,7 +1,8 @@
 import "server-only";
 import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
-import type { AccessContext } from "../access/context";
+import { loadAccessContext, type AccessContext } from "../access/context";
+import { assertCanGrantRole, firmTeamAuthority } from "../access/grants";
 import { MFA_MANDATORY_ROLE_KEYS } from "../access/permissions";
 import { audit } from "../audit";
 import { db } from "../db/client";
@@ -12,7 +13,7 @@ import { sendEmail, simpleEmail, type EmailResult } from "../integrations/email"
 import { randomToken, sha256 } from "./crypto";
 import { hashPassword, passwordProblem, verifyPassword } from "./password";
 import { createSession, deleteUserSessions } from "./sessions";
-import { assertNotThrottled, recordAttempt } from "./throttle";
+import { beginAttempt, finishAttempt } from "./throttle";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RESET_TTL_MS = 60 * 60 * 1000;
@@ -23,7 +24,7 @@ export const normaliseEmail = (e: string) => e.trim().toLowerCase();
 
 export async function signIn(input: { email: string; password: string; ip: string | null; userAgent: string | null }) {
   const email = normaliseEmail(input.email);
-  await assertNotThrottled("password", email, input.ip);
+  const attempt = await beginAttempt("password", email, input.ip);
 
   const [user] = await db()
     .select({ id: users.id, orgId: users.orgId, hash: users.passwordHash, status: users.status, kind: users.kind, mfaEnabledAt: users.mfaEnabledAt })
@@ -33,12 +34,11 @@ export async function signIn(input: { email: string; password: string; ip: strin
 
   const passwordOk = await verifyPassword(user?.hash ?? null, input.password);
   if (!user || !passwordOk || user.status !== "active" || user.kind !== "staff") {
-    await recordAttempt("password", email, input.ip, false);
     if (user) await audit({ orgId: user.orgId, actorId: user.id, action: "auth.sign_in_failed", entityType: "user", entityId: user.id, ip: input.ip });
     throw new ValidationError("Email or password is incorrect.");
   }
 
-  await recordAttempt("password", email, input.ip, true);
+  await finishAttempt(attempt, true);
   const mfaEnabled = !!user.mfaEnabledAt;
   const session = await createSession(user.id, { mfaVerified: !mfaEnabled, ip: input.ip, userAgent: input.userAgent });
   await db().update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
@@ -67,10 +67,6 @@ const inviteSchema = z.object({
 });
 export type InviteInput = z.input<typeof inviteSchema>;
 
-function isSubset(needed: readonly string[], held: ReadonlySet<string>) {
-  return needed.every((p) => held.has(p));
-}
-
 /**
  * Invite someone to the organisation (group role) or to a firm (firm role).
  * Enforces the subset rule so nobody can grant more than they hold.
@@ -89,19 +85,15 @@ export async function createInvitation(
   let firmName: string | null = null;
   if (role.scope === "group") {
     if (input.firmId) throw new ValidationError("Group roles are not tied to a firm.");
-    ctx.require("staff:invite");
-    if (!isSubset(role.permissions, ctx.group!.permissions)) throw new AccessDeniedError("subset");
   } else if (role.scope === "firm") {
     if (!input.firmId) throw new ValidationError("Choose the firm.", { firmId: "Choose the firm." });
     const [firm] = await db().select({ id: firms.id, name: firms.tradingName }).from(firms).where(and(eq(firms.id, input.firmId), eq(firms.orgId, ctx.orgId))).limit(1);
     if (!firm) throw new NotFoundError("Firm");
     firmName = firm.name;
-    const viaFirm = ctx.has("team:invite", firm.id) && isSubset(role.permissions, ctx.firm(firm.id).permissions);
-    const viaGroup = ctx.has("staff:manage");
-    if (!viaFirm && !viaGroup) throw new AccessDeniedError("team:invite");
   } else {
     throw new ValidationError("Client portal invitations arrive with the client portal (Release 4).");
   }
+  await assertCanGrantRole(ctx, role, input.firmId);
 
   const [existing] = await db().select({ id: users.id, status: users.status, kind: users.kind }).from(users).where(eq(users.email, input.email)).limit(1);
   if (existing) {
@@ -179,7 +171,7 @@ export async function createInvitation(
 export async function revokeInvitation(ctx: AccessContext, invitationId: string) {
   const [inv] = await db().select().from(invitations).where(and(eq(invitations.id, invitationId), eq(invitations.orgId, ctx.orgId))).limit(1);
   if (!inv || inv.acceptedAt || inv.revokedAt) throw new NotFoundError("Invitation");
-  const allowed = inv.firmId ? ctx.has("team:invite", inv.firmId) || ctx.has("staff:manage") : ctx.has("staff:invite");
+  const allowed = inv.firmId ? !!(await firmTeamAuthority(ctx, inv.firmId, "team:invite")) : ctx.has("staff:invite");
   if (!allowed) throw new AccessDeniedError("team:invite");
   await db().update(invitations).set({ revokedAt: new Date() }).where(eq(invitations.id, inv.id));
   await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId: inv.firmId, action: "staff.invitation_revoked", entityType: "invitation", entityId: inv.id, summary: `Revoked invitation for ${inv.email}`, ip: ctx.ip });
@@ -231,6 +223,14 @@ export async function acceptInvitation(input: {
     if (!inv) throw invalid;
     const [role] = await tx.select().from(roles).where(eq(roles.id, inv.roleId)).limit(1);
     if (!role) throw invalid;
+    // The person who invited must still be allowed to grant this role today.
+    const inviter = await loadAccessContext(inv.invitedById);
+    if (!inviter) throw invalid;
+    try {
+      await assertCanGrantRole(inviter, role, inv.firmId);
+    } catch {
+      throw invalid;
+    }
 
     const [existing] = await tx.select().from(users).where(eq(users.email, inv.email)).limit(1);
     let userId: string;
@@ -275,8 +275,8 @@ export async function acceptInvitation(input: {
 /** Always resolves the same way whether or not the email exists. */
 export async function requestPasswordReset(rawEmail: string, ip: string | null) {
   const email = normaliseEmail(rawEmail);
-  await assertNotThrottled("reset", null, ip);
-  await recordAttempt("reset", email, ip, false); // counts towards the IP limit
+  // Counts per address and per IP, so nobody can flood an inbox with reset emails.
+  await beginAttempt("reset", email, ip);
   const [user] = await db().select({ id: users.id, orgId: users.orgId, status: users.status, kind: users.kind }).from(users).where(eq(users.email, email)).limit(1);
   if (!user || user.status !== "active" || user.kind !== "staff") return;
 
@@ -318,8 +318,10 @@ export async function resetPassword(token: string, password: string, ip: string 
 }
 
 export async function changePassword(ctx: AccessContext, current: string, next: string) {
+  const attempt = await beginAttempt("password", ctx.user.email, ctx.ip);
   const [u] = await db().select({ hash: users.passwordHash }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
   if (!(await verifyPassword(u?.hash ?? null, current))) throw new ValidationError("Your current password is incorrect.", { current: "Incorrect password." });
+  await finishAttempt(attempt, true);
   const problem = passwordProblem(next, ctx.user.email);
   if (problem) throw new ValidationError(problem, { password: problem });
   await db().update(users).set({ passwordHash: await hashPassword(next), passwordChangedAt: new Date(), updatedAt: new Date() }).where(eq(users.id, ctx.user.id));

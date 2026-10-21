@@ -17,3 +17,6 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L12 | No backups, monitoring or error tracking are configured (no hosting yet) | Not ready for real client data | Deployment checklist |
 | L13 | Privacy compliance (POPIA, Australian Privacy Act, GDPR) not legally reviewed | Must be reviewed before live use | Legal review; data-residency decision |
 | L14 | The Hub logo is a placeholder monogram | Visual only | Add the official logo file |
+| L15 | Row-level security relies on per-transaction settings that the application sets itself | A compromised application role could widen its own scope; the database protects against application bugs, not against a stolen app connection | Accepted design assumption; keep the app credential tightly held |
+| L16 | The organisation audit log (group `audit:view`) lists event summaries for all firms, including firms that don't share metrics | Summaries use references, not names, but reveal activity volume | Decide with the firms; filter by firm policy if required |
+| L17 | A few same-firm links (assigned user, department, routed lead) are enforced in the application, not by database keys | Low risk; services validate them | Add constraints when those tables next change |

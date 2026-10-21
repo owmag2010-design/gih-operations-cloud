@@ -24,7 +24,7 @@ Status as of Release 1. "Done" means implemented and covered by a test or a manu
 | TOTP two-step sign-in; mandatory for admin roles; firm option for everyone | Done |
 | TOTP replay protection; single-use recovery codes stored hashed | Done |
 | MFA secret encrypted at rest (AES-256-GCM) | Done |
-| Sign-in throttling per account and per IP | Done |
+| Sign-in, MFA, reset and password-change throttling, race-safe, per account and per IP | Done |
 | No account enumeration on sign-in and reset | Done |
 | Invitation and reset links single-use, expiring, stored hashed | Done |
 | Deactivation ends all sessions immediately | Done |
@@ -42,9 +42,10 @@ Status as of Release 1. "Done" means implemented and covered by a test or a manu
 ## Not yet done (tracked in the known-limitations register)
 - CSP still allows `'unsafe-inline'` scripts (Next.js inline runtime); move to nonces
 - Rate limiting is database-based; add an edge rate limiter in production
+- An independent security review was completed on 21 Oct 2026; all high and medium findings are fixed (see the test report)
 - No malware scanning or file storage yet (Release 4)
 - No automated backup/restore drill yet
-- Session re-authentication for sensitive actions (other than disabling MFA) not yet required
+- Re-authentication is required for turning off two-step sign-in and changing the password; other sensitive actions (role changes, exports) don't yet ask again
 - Security monitoring and alerting not yet connected
 
 ## Privacy (POPIA, Australian Privacy Act, GDPR where relevant)

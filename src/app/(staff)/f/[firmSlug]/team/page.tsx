@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/ui/forms";
 import { Badge, EmptyState, PageHeader, Panel, PanelHeader, tableClass as t } from "@/components/ui/primitives";
+import { firmTeamAuthority } from "@/server/access/grants";
 import { grantableFirmRoles, listFirmTeam, listPendingInvitations } from "@/server/modules/people/people";
 import { requireFirm } from "@/server/next/session";
 import { InviteDialog, RemoveMember, RevokeInvite, RoleSelect } from "./client";
@@ -14,7 +15,7 @@ export default async function TeamPage({ params }: PageProps<"/f/[firmSlug]/team
   if (!ctx.has("team:view", firm.firmId)) notFound();
   const [team, invites, roles] = await Promise.all([listFirmTeam(ctx, firm.firmId), listPendingInvitations(ctx, firm.firmId), grantableFirmRoles(ctx, firm.firmId)]);
   const canInvite = ctx.has("team:invite", firm.firmId) && roles.length > 0;
-  const canManage = ctx.has("team:manage", firm.firmId) || ctx.has("staff:manage");
+  const canManage = !!(await firmTeamAuthority(ctx, firm.firmId, "team:manage"));
   return (
     <>
       <PageHeader

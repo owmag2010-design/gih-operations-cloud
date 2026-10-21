@@ -36,6 +36,13 @@
       "when": 1792554768611,
       "tag": "0004_metrics_converted_at",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792556273523,
+      "tag": "0005_definer_hardening",
+      "breakpoints": true
     }
   ]
 }

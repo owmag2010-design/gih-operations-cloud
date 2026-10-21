@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, count, desc, eq, gt, inArray, isNull, ne } from "drizzle-orm";
 import type { AccessContext } from "../../access/context";
+import { assertCanManageMember, firmTeamAuthority } from "../../access/grants";
 import { audit } from "../../audit";
 import { deleteUserSessions } from "../../auth/sessions";
 import { db } from "../../db/client";
@@ -17,10 +18,19 @@ export async function listRoles(ctx: AccessContext, scope?: "group" | "firm") {
 /** Roles the caller may grant in a firm (subset rule), or every firm role for group staff managers. */
 export async function grantableFirmRoles(ctx: AccessContext, firmId: string) {
   const all = await listRoles(ctx, "firm");
-  if (ctx.has("staff:manage")) return all;
-  if (!ctx.has("team:invite", firmId) && !ctx.has("team:manage", firmId)) return [];
+  const authority = (await firmTeamAuthority(ctx, firmId, "team:invite")) ?? (await firmTeamAuthority(ctx, firmId, "team:manage"));
+  if (!authority) return [];
+  if (authority === "group") return all;
   const held = ctx.firm(firmId).permissions;
   return all.filter((r) => subset(r.permissions, held));
+}
+
+/** Firms where the caller may invite staff (their own team rights, or Hub rights the firm has allowed). */
+export async function invitableFirms(ctx: AccessContext) {
+  const all = await db().select({ id: firms.id, name: firms.tradingName, status: firms.status }).from(firms).where(eq(firms.orgId, ctx.orgId)).orderBy(asc(firms.tradingName));
+  const out: { id: string; name: string }[] = [];
+  for (const f of all) if (f.status === "active" && (await firmTeamAuthority(ctx, f.id, "team:invite"))) out.push({ id: f.id, name: f.name });
+  return out;
 }
 
 export async function grantableGroupRoles(ctx: AccessContext) {
@@ -89,9 +99,6 @@ async function loadMembership(ctx: AccessContext, membershipId: string) {
   return m;
 }
 
-function canManageFirmTeam(ctx: AccessContext, firmId: string) {
-  return ctx.has("team:manage", firmId) || ctx.has("staff:manage");
-}
 
 async function assertNotLastAdmin(firmId: string, exceptMembershipId: string) {
   const [{ n }] = await db()
@@ -105,17 +112,12 @@ async function assertNotLastAdmin(firmId: string, exceptMembershipId: string) {
 
 export async function changeFirmRole(ctx: AccessContext, membershipId: string, roleId: string) {
   const m = await loadMembership(ctx, membershipId);
-  if (!canManageFirmTeam(ctx, m.firmId)) throw new AccessDeniedError("team:manage");
   if (m.userId === ctx.user.id) throw new AccessDeniedError("self");
   const [role] = await db().select().from(roles).where(and(eq(roles.id, roleId), eq(roles.orgId, ctx.orgId), eq(roles.scope, "firm"))).limit(1);
   if (!role) throw new ValidationError("Choose a firm role.");
-  if (!ctx.has("staff:manage")) {
-    const held = ctx.firm(m.firmId).permissions;
-    if (!subset(role.permissions, held)) throw new AccessDeniedError("subset");
-    // Nor may they change the role of someone who holds more than they do.
-    const [current] = await db().select().from(roles).where(eq(roles.id, m.roleId));
-    if (!subset(current.permissions, held)) throw new AccessDeniedError("subset");
-  }
+  const [current] = await db().select().from(roles).where(eq(roles.id, m.roleId));
+  // Nobody may grant more than they hold, or change someone who holds more than they do.
+  await assertCanManageMember(ctx, m.firmId, current.permissions, role);
   if (m.roleKey === "firm_admin" && role.key !== "firm_admin") await assertNotLastAdmin(m.firmId, m.id);
   await db().update(firmMemberships).set({ roleId: role.id }).where(eq(firmMemberships.id, m.id));
   await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId: m.firmId, action: "staff.role_changed", entityType: "firm_membership", entityId: m.id, summary: `${m.userName} is now ${role.name}`, data: { from: m.roleKey, to: role.key }, ip: ctx.ip });
@@ -123,7 +125,8 @@ export async function changeFirmRole(ctx: AccessContext, membershipId: string, r
 
 export async function updateMembershipDetails(ctx: AccessContext, membershipId: string, details: { title?: string; departmentId?: string | null }) {
   const m = await loadMembership(ctx, membershipId);
-  if (!canManageFirmTeam(ctx, m.firmId)) throw new AccessDeniedError("team:manage");
+  const [current] = await db().select().from(roles).where(eq(roles.id, m.roleId));
+  await assertCanManageMember(ctx, m.firmId, current.permissions);
   if (details.departmentId) {
     const [d] = await db().select().from(departments).where(and(eq(departments.id, details.departmentId), eq(departments.firmId, m.firmId)));
     if (!d) throw new ValidationError("Choose a department of this firm.");
@@ -133,12 +136,9 @@ export async function updateMembershipDetails(ctx: AccessContext, membershipId: 
 
 export async function removeFirmMembership(ctx: AccessContext, membershipId: string) {
   const m = await loadMembership(ctx, membershipId);
-  if (!canManageFirmTeam(ctx, m.firmId)) throw new AccessDeniedError("team:manage");
   if (m.userId === ctx.user.id) throw new AccessDeniedError("self");
-  if (!ctx.has("staff:manage")) {
-    const [current] = await db().select().from(roles).where(eq(roles.id, m.roleId));
-    if (!subset(current.permissions, ctx.firm(m.firmId).permissions)) throw new AccessDeniedError("subset");
-  }
+  const [current] = await db().select().from(roles).where(eq(roles.id, m.roleId));
+  await assertCanManageMember(ctx, m.firmId, current.permissions);
   if (m.roleKey === "firm_admin") await assertNotLastAdmin(m.firmId, m.id);
   await db().delete(firmMemberships).where(eq(firmMemberships.id, m.id));
   await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId: m.firmId, action: "staff.removed_from_firm", entityType: "firm_membership", entityId: m.id, summary: `Removed ${m.userName} from the firm`, ip: ctx.ip });

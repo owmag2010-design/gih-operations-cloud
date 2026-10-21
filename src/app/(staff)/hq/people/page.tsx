@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/ui/forms";
 import { Badge, EmptyState, PageHeader, Panel, PanelHeader, tableClass as t } from "@/components/ui/primitives";
-import { listFirms } from "@/server/modules/org/firms";
-import { grantableGroupRoles, listOrgStaff, listPendingInvitations, listRoles } from "@/server/modules/people/people";
+import { grantableGroupRoles, invitableFirms, listOrgStaff, listPendingInvitations, listRoles } from "@/server/modules/people/people";
 import { requireStaff } from "@/server/next/session";
 import { GroupRoleSelect, InviteStaffDialog, PersonActions, RevokeStaffInvite } from "./client";
 
@@ -13,7 +12,7 @@ export default async function PeoplePage() {
   const { ctx } = await requireStaff();
   if (!ctx.has("staff:view")) notFound();
   const [staff, invites, groupRoles, firmRoles, firms] = await Promise.all([
-    listOrgStaff(ctx), listPendingInvitations(ctx, null), grantableGroupRoles(ctx), listRoles(ctx, "firm"), listFirms(ctx),
+    listOrgStaff(ctx), listPendingInvitations(ctx, null), grantableGroupRoles(ctx), listRoles(ctx, "firm"), invitableFirms(ctx),
   ]);
   const canManage = ctx.has("staff:manage");
   const canInvite = ctx.has("staff:invite");
@@ -25,8 +24,8 @@ export default async function PeoplePage() {
         actions={canInvite ? (
           <InviteStaffDialog
             groupRoles={groupRoles.map((r) => ({ id: r.id, name: r.name }))}
-            firmRoles={canManage ? firmRoles.map((r) => ({ id: r.id, name: r.name })) : []}
-            firms={firms.filter((f) => f.status === "active").map((f) => ({ id: f.id, name: f.tradingName }))}
+            firmRoles={firms.length ? firmRoles.map((r) => ({ id: r.id, name: r.name })) : []}
+            firms={firms}
           />
         ) : null}
       />

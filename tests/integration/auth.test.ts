@@ -88,4 +88,24 @@ describe("authentication", () => {
     expect(await validateSessionToken(token)).toBeNull();
     void db;
   });
+
+  it("counts parallel guesses against the limit (review M1)", async () => {
+    const { token, email } = await invitedUser();
+    await acceptInvitation({ token, password: PASSWORD, ip: null, userAgent: null });
+    const results = await Promise.allSettled(Array.from({ length: 12 }, () => signIn({ email, password: "wrong password!!", ip: "198.51.100.7", userAgent: null })));
+    const passwordChecked = results.filter((r) => r.status === "rejected" && r.reason instanceof ValidationError).length;
+    expect(passwordChecked).toBeLessThanOrEqual(5);
+    expect(results.filter((r) => r.status === "rejected" && r.reason instanceof RateLimitedError).length).toBeGreaterThanOrEqual(7);
+  });
+
+  it("accepts a TOTP code once even when submitted twice at the same moment (review L4)", async () => {
+    const u = await makeUser({ firms: { veritas: "firm_admin" } });
+    const { secret } = await beginMfaEnrolment(u.user.id, u.user.email);
+    await confirmMfaEnrolment(u.user.id, await generate({ secret }));
+    // Move the replay marker back so the next code is fresh, then race two submissions of it.
+    await owner.update(users).set({ mfaLastTimeStep: 0 }).where(eq(users.id, u.user.id));
+    const code = await generate({ secret });
+    const [a, b] = await Promise.all([verifyMfa(u.user.id, code), verifyMfa(u.user.id, code)]);
+    expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1);
+  });
 });

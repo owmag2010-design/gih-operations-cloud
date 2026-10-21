@@ -56,6 +56,7 @@ describe("permissions and privilege escalation", () => {
     await expect(changeFirmRole(admin, mine.id, await roleId("reviewer"))).rejects.toBeInstanceOf(AccessDeniedError);
 
     const superAdmin = await makeUser({ group: "group_super_admin" });
+    await setFirmPolicy("veritas", { allowGroupAdminAccess: true });
     await expect(removeFirmMembership(superAdmin, mine.id)).rejects.toBeInstanceOf(ValidationError);
     await expect(changeFirmRole(superAdmin, mine.id, await roleId("reviewer"))).rejects.toBeInstanceOf(ValidationError);
     await expect(setGroupRole(superAdmin, superAdmin.user.id, null)).rejects.toBeInstanceOf(AccessDeniedError);
@@ -105,5 +106,28 @@ describe("permissions and privilege escalation", () => {
     await setFirmPolicy("veritas", { allowGroupAdminAccess: true });
     await joinFirmAsGroupAdmin(superAdmin, veritas);
     expect((await reload(superAdmin))!.firms.has(veritas)).toBe(true);
+  });
+
+  it("Hub administrators can't place people in a firm whose policy keeps the Hub out (review H1)", async () => {
+    const veritas = await firmId("veritas");
+    const superAdmin = await makeUser({ group: "group_super_admin" });
+    const member = await makeUser({ firms: { veritas: "reviewer" } });
+    const m = (await owner.select().from(firmMemberships).where(eq(firmMemberships.userId, member.user.id)))[0];
+    await expect(createInvitation(superAdmin, { email: "alias@test.example", name: "Alias", roleId: await roleId("firm_admin"), firmId: veritas })).rejects.toBeInstanceOf(AccessDeniedError);
+    await expect(changeFirmRole(superAdmin, m.id, await roleId("firm_admin"))).rejects.toBeInstanceOf(AccessDeniedError);
+    await expect(removeFirmMembership(superAdmin, m.id)).rejects.toBeInstanceOf(AccessDeniedError);
+    await setFirmPolicy("veritas", { allowGroupAdminAccess: true });
+    await expect(createInvitation(superAdmin, { email: "ok@test.example", name: "Allowed", roleId: await roleId("immigration_consultant"), firmId: veritas })).resolves.toBeTruthy();
+  });
+
+  it("an invitation stops working if the inviter loses the right to grant it", async () => {
+    const veritas = await firmId("veritas");
+    const admin = await makeUser({ firms: { veritas: "firm_admin" } });
+    await makeUser({ firms: { veritas: "firm_admin" } }); // keeps a firm admin after the demotion
+    const { link } = await createInvitation(admin, { email: "late@test.example", name: "Late Joiner", roleId: await roleId("immigration_consultant"), firmId: veritas });
+    const am = (await owner.select().from(firmMemberships).where(eq(firmMemberships.userId, admin.user.id)))[0];
+    await owner.update(firmMemberships).set({ roleId: await roleId("reviewer") }).where(eq(firmMemberships.id, am.id));
+    const { acceptInvitation } = await import("../../src/server/auth/service");
+    await expect(acceptInvitation({ token: link.split("/invite/")[1], password: "a long enough passphrase", ip: null, userAgent: null })).rejects.toBeInstanceOf(ValidationError);
   });
 });

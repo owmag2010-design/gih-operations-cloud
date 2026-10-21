@@ -88,4 +88,14 @@ describe("CRM", () => {
     expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
     expect(await auditCount("lead.exported")).toBe(1);
   });
+
+  it("assigned-only users see only their own leads' tags (review L6)", async () => {
+    const veritas = await firmId("veritas");
+    const admin = await makeUser({ firms: { veritas: "firm_admin" } });
+    const support = await makeUser({ firms: { veritas: "support_officer" } });
+    await createLead(admin, veritas, lead({ tags: "asylum-history" }));
+    await createLead(admin, veritas, lead({ tags: "mine", assignedToId: support.user.id }));
+    const { leadTags } = await import("../../src/server/modules/crm/leads");
+    expect(await leadTags(support, veritas)).toEqual(["mine"]);
+  });
 });

@@ -133,8 +133,11 @@ export function MfaSetup({ enabled, mandatory }: { enabled: boolean; mandatory: 
         ) : (
           <form action={disable} className="flex max-w-sm flex-col gap-3">
             <ActionFeedback state={disableState} />
-            <Field label="Confirm with your password to turn it off" name="password">
+            <Field label="Your password" name="password">
               <Input type="password" autoComplete="current-password" required />
+            </Field>
+            <Field label="A current code from your app" name="code">
+              <Input inputMode="numeric" autoComplete="one-time-code" required maxLength={20} className="num tracking-widest" />
             </Field>
             <div><SubmitButton variant="danger" pendingText="Turning off…">Turn off two-step sign-in</SubmitButton></div>
           </form>

@@ -168,7 +168,7 @@ export async function setIntakeStatus(ctx: AccessContext, itemId: string, status
     const [item] = await tx.select().from(intakeItems).where(and(eq(intakeItems.id, itemId), ne(intakeItems.status, "routed"))).for("update").limit(1);
     if (!item) throw new NotFoundError("Enquiry");
     await tx.update(intakeItems).set({ status, note: note?.trim().slice(0, 1000) || item.note }).where(eq(intakeItems.id, item.id));
-    await audit({ orgId: ctx.orgId, actorId: ctx.user.id, action: `intake.${status === "new" ? "reopened" : status}`, entityType: "intake_item", entityId: item.id, data: { note: note?.slice(0, 200) }, ip: ctx.ip }, tx);
+    await audit({ orgId: ctx.orgId, actorId: ctx.user.id, action: `intake.${status === "new" ? "reopened" : status}`, entityType: "intake_item", entityId: item.id, data: { withNote: !!note?.trim() }, ip: ctx.ip }, tx);
   });
 }
 

@@ -87,6 +87,16 @@ test("the intake webhook needs a valid signature and is idempotent", async ({ re
   expect((await send(enquiry)).status()).toBe(201);
   expect((await send(enquiry)).status()).toBe(200);
   expect((await send({ firstName: "" })).status()).toBe(422);
+
+  // A replayed request without a sender id is still recognised as the same delivery.
+  const raw = JSON.stringify({ firstName: "Replay", email: "replay@example.test", enquiry: "Visitor visa", source: "website_form" });
+  const ts = String(Math.floor(Date.now() / 1000));
+  const headers = { "content-type": "application/json", "x-gih-timestamp": ts, "x-gih-signature": createHmac("sha256", secret).update(`${ts}.${raw}`).digest("hex") };
+  expect((await request.post("/api/intake/webhook", { data: raw, headers })).status()).toBe(201);
+  expect((await request.post("/api/intake/webhook", { data: raw, headers })).status()).toBe(200);
+
+  // Oversized bodies are refused before they are read.
+  expect((await send({ firstName: "Big", email: "big@example.test", enquiry: "x".repeat(70_000) })).status()).toBe(413);
 });
 
 test("sign-in and leads pages have no serious accessibility violations", async ({ page }) => {

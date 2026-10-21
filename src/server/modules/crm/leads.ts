@@ -557,14 +557,17 @@ export async function exportLeadsCsv(ctx: AccessContext, firmId: string, f: Lead
       [r.ref, r.firstName, r.lastName, r.email, r.phone, r.currentCountry, r.destinationCountry, r.immigrationCategory, r.stageName, r.assigneeName, r.priority, r.source, r.followUpAt, r.tags.join(" "), r.createdAt].map(cell).join(","),
     ),
   );
-  await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId, action: "lead.exported", entityType: "lead", summary: `Exported ${rows.length} lead(s) to CSV`, data: { count: rows.length, filters: { ...f } }, ip: ctx.ip });
+  await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId, action: "lead.exported", entityType: "lead", summary: `Exported ${rows.length} lead(s) to CSV`, data: { count: rows.length, filters: { ...f, q: f.q ? "(search text)" : undefined } }, ip: ctx.ip });
   return lines.join("\r\n");
 }
 
+/** Tags on the leads the caller can see (assigned-only roles see only their own leads' tags). */
 export async function leadTags(ctx: AccessContext, firmId: string) {
-  viewMode(ctx, firmId);
+  const mineOnly = viewMode(ctx, firmId) === "assigned";
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const res = await tx.execute<{ tag: string }>(sql`select distinct unnest(tags) as tag from leads where firm_id = ${firmId} and deleted_at is null order by 1 limit 200`);
+    const res = await tx.execute<{ tag: string }>(
+      sql`select distinct unnest(tags) as tag from leads where firm_id = ${firmId} and deleted_at is null ${mineOnly ? sql`and assigned_to_id = ${ctx.user.id}` : sql``} order by 1 limit 200`,
+    );
     return res.rows.map((r) => r.tag);
   });
 }
