@@ -13,6 +13,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { migrationUrl } from "./connection-url";
 import * as s from "../src/server/db/schema";
 
 config({ path: process.env.DOTENV_PATH ?? ".env.local" });
@@ -30,7 +31,7 @@ async function main() {
     console.error('Usage: npm run admin:create -- --email you@example.com --name "Your Name" [--firm-admin-all]');
     process.exit(1);
   }
-  const pool = new Pool({ connectionString: process.env.MIGRATION_DATABASE_URL, max: 1 });
+  const pool = new Pool({ connectionString: migrationUrl(), max: 1 });
   const db = drizzle(pool, { schema: s });
 
   const link = await db.transaction(async (tx) => {
