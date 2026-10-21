@@ -268,6 +268,18 @@ async function findDuplicates(tx: Tx, ctx: AccessContext, firmId: string, p: { e
     .limit(10);
 }
 
+async function findDuplicatesInFirm(tx: Tx, firmId: string, p: { email?: string | null; phone?: string | null; excludeId?: string }) {
+  const match: SQL[] = [];
+  if (p.email) match.push(eq(leads.email, p.email));
+  if (p.phone) match.push(eq(leads.phone, p.phone));
+  if (!match.length) return [];
+  return tx
+    .select({ id: leads.id, ref: leads.ref })
+    .from(leads)
+    .where(and(eq(leads.firmId, firmId), isNull(leads.deletedAt), or(...match), p.excludeId ? ne(leads.id, p.excludeId) : undefined))
+    .limit(10);
+}
+
 /* ───────────────────────── Mutations ───────────────────────── */
 
 type CreateOpts = { tx?: Tx; actorId?: string | null; intakeItemId?: string; skipPermission?: boolean };
@@ -319,10 +331,16 @@ export async function createLead(ctx: AccessContext, firmId: string, raw: unknow
       await tx.insert(consentRecords).values({ firmId, leadId: lead.id, purpose: "contact", granted: true, method: input.consentMethod ?? "Recorded by staff", recordedById: actorId });
       await tx.insert(activities).values({ firmId, leadId: lead.id, type: "consent", actorId, data: { purpose: "contact", granted: true } });
     }
-    const duplicates = await findDuplicates(tx, ctx, firmId, { email: lead.email, phone: lead.phone, excludeId: lead.id });
-    if (duplicates.length) {
-      await tx.insert(activities).values({ firmId, leadId: lead.id, type: "duplicate_flagged", actorId, data: { refs: duplicates.map((d) => d.ref) } });
+    // Callers without lead access (e.g. Hub triage routing into a firm) still flag
+    // duplicates on the lead, but get nothing back about other records.
+    const canView = ctx.has("leads:view_all", firmId) || ctx.has("leads:view_assigned", firmId);
+    const found = canView
+      ? await findDuplicates(tx, ctx, firmId, { email: lead.email, phone: lead.phone, excludeId: lead.id })
+      : await findDuplicatesInFirm(tx, firmId, { email: lead.email, phone: lead.phone, excludeId: lead.id });
+    if (found.length) {
+      await tx.insert(activities).values({ firmId, leadId: lead.id, type: "duplicate_flagged", actorId, data: { refs: found.map((d) => d.ref) } });
     }
+    const duplicates = canView ? found : [];
     await audit({ orgId: ctx.orgId, actorId, firmId, action: "lead.created", entityType: "lead", entityId: lead.id, summary: `Created ${lead.ref}`, ip: ctx.ip }, tx);
     return { lead, duplicates };
   };
