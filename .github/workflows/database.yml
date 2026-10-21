@@ -1,0 +1,53 @@
+# Run database tasks against the production database from GitHub, so the owner
+# connection string lives only in GitHub secrets (never in Vercel or chat).
+#
+# Repository secret required: MIGRATION_DATABASE_URL (Supabase owner connection,
+# the "Session pooler" string with the postgres user and database password).
+# Repository variable: APP_URL (e.g. https://gih-operations-cloud.vercel.app).
+name: Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "What to run"
+        type: choice
+        options: [migrate-and-seed, migrate, create-admin]
+        default: migrate-and-seed
+      admin_email:
+        description: "create-admin only: email of the first administrator"
+        required: false
+      admin_name:
+        description: "create-admin only: full name"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+      APP_URL: ${{ vars.APP_URL }}
+      DOTENV_PATH: /dev/null
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Migrate
+        if: inputs.task != 'create-admin'
+        run: npx tsx scripts/migrate.ts
+      - name: Seed configuration
+        if: inputs.task == 'migrate-and-seed'
+        run: npx tsx scripts/seed.ts
+      - name: Create administrator
+        if: inputs.task == 'create-admin'
+        env:
+          ADMIN_EMAIL: ${{ inputs.admin_email }}
+          ADMIN_NAME: ${{ inputs.admin_name }}
+        run: npx tsx scripts/create-admin.ts --email "$ADMIN_EMAIL" --name "$ADMIN_NAME" --firm-admin-all

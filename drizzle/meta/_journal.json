@@ -43,6 +43,13 @@
       "when": 1792556273523,
       "tag": "0005_definer_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792560117443,
+      "tag": "0006_supabase_api_lockdown",
+      "breakpoints": true
     }
   ]
 }
