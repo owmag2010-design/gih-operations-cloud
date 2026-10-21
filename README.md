@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GIH Operations Cloud
 
-## Getting Started
+Operations platform for **Global Immigration Hub** and its partner firms (Veritas Emigrate, Mimshac Group, Nextmove Advisory). One system from enquiry to client, with each firm's records kept separate.
 
-First, run the development server:
+**Status:** Release 1 (enterprise foundation) built and tested. Not yet production-ready: see [the deployment checklist](docs/10-deployment.md#deployment-checklist-before-real-client-data) and the [known-limitations register](docs/14-known-limitations.md).
 
+## What works today
+- Sign-in with two-step verification, invitations, password reset, session management
+- Hub intake queue fed by a signed webhook or manual capture, with configurable routing rules
+- Firm workspaces: leads (table, board, follow-up calendar, saved views, bulk actions, CSV export), clients, team, settings, audit log
+- Group Command Centre with real counts from firms that share them
+- Firm isolation enforced in the services **and** in PostgreSQL row-level security
+
+## Stack
+Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Radix UI · Drizzle ORM · PostgreSQL 16 · Vitest · Playwright
+
+## Quick start
+See [docs/10-deployment.md](docs/10-deployment.md). In short:
 ```bash
+npm install
+cp .env.example .env.local   # fill in
+npm run db:migrate && npm run db:seed
+npm run admin:create -- --email you@example.com --name "Your Name" --firm-admin-all
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tests
+```bash
+npm test            # 37 unit and integration tests (database: gih_test)
+npm run test:e2e    # 7 end-to-end tests incl. accessibility (database: gih_e2e)
+npm run lint && npm run typecheck
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Documentation
+| | |
+|---|---|
+| [Product requirements](docs/01-product-requirements.md) | [System architecture](docs/02-system-architecture.md) |
+| [Database and firm isolation](docs/03-database-and-isolation.md) | [Roles and permissions](docs/04-roles-and-permissions.md) |
+| [Navigation map](docs/05-navigation-map.md) | [Design system](docs/06-design-system.md) |
+| [Roadmap](docs/07-roadmap.md) | [Integrations and configuration](docs/08-integrations-and-configuration.md) |
+| [API](docs/09-api.md) | [Deployment](docs/10-deployment.md) |
+| [Migration plan](docs/11-migration-plan.md) | [Security checklist](docs/12-security-checklist.md) |
+| [Administrator guide](docs/13-administrator-guide.md) | [Known limitations](docs/14-known-limitations.md) |
+| [Test report](docs/15-test-report.md) | [Progress log](docs/PROGRESS.md) |

@@ -29,6 +29,13 @@
       "when": 1792552185486,
       "tag": "0003_mfa_replay",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792554768611,
+      "tag": "0004_metrics_converted_at",
+      "breakpoints": true
     }
   ]
 }
