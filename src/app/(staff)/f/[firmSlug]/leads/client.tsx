@@ -11,6 +11,7 @@ import { ActionFeedback, LocalTime, SubmitButton } from "@/components/ui/forms";
 import { Badge, Button, Checkbox, cn, EmptyState, Field, Input, Select, tableClass as t } from "@/components/ui/primitives";
 import { countryName } from "@/lib/countries";
 import { fullName, PRIORITY_LABELS, PRIORITY_TONE, SOURCE_LABELS, STAGE_TONE } from "@/lib/labels";
+import type { ActionResult } from "@/server/errors";
 import { assignLeadsAction, changeStageAction, deleteLeadsAction, deleteViewAction, saveViewAction } from "../actions";
 
 export type LeadRow = {
@@ -149,8 +150,11 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
 
 function SavedViews({ views, firmSlug, canShare, currentQuery }: { views: { id: string; name: string; query: string; mine: boolean; shared: boolean }[]; firmSlug: string; canShare: boolean; currentQuery: string }) {
   const [open, setOpen] = useState(false);
-  const [state, action] = useActionState(saveViewAction.bind(null, firmSlug, currentQuery), null);
-  useEffect(() => { if (state?.ok) setOpen(false); }, [state]);
+  const [state, action] = useActionState(async (prev: ActionResult | null, form: FormData) => {
+    const r = await saveViewAction(firmSlug, currentQuery, prev, form);
+    if (r.ok) setOpen(false);
+    return r;
+  }, null);
   const base = `/f/${firmSlug}/leads`;
   return (
     <Popover.Root>
@@ -217,11 +221,12 @@ export function LeadsTable({
   perms: { create: boolean; edit: boolean; assign: boolean; remove: boolean };
   hasFilters: boolean;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [rawSelected, setSelected] = useState<Set<string>>(new Set());
   const [busy, start] = useTransition();
   const { params, set } = useQueryUpdater();
   const ids = useMemo(() => rows.map((r) => r.id), [rows]);
-  useEffect(() => setSelected(new Set()), [ids]);
+  // Only rows on the current page can be selected; filtering or paging drops the rest.
+  const selected = useMemo(() => new Set([...rawSelected].filter((id) => ids.includes(id))), [rawSelected, ids]);
   const base = `/f/${firmSlug}/leads`;
   const canBulk = perms.edit || perms.assign || perms.remove;
   const allChecked = selected.size > 0 && selected.size === rows.length;
@@ -358,9 +363,13 @@ function Pagination({ total, page, pageSize, onPage }: { total: number; page: nu
 
 export function LeadBoard({ firmSlug, stages, rows, canEdit }: { firmSlug: string; stages: { id: string; name: string }[]; rows: LeadRow[]; canEdit: boolean }) {
   const [local, setLocal] = useState(rows);
+  const [prevRows, setPrevRows] = useState(rows);
+  if (rows !== prevRows) {
+    setPrevRows(rows);
+    setLocal(rows);
+  }
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
-  useEffect(() => setLocal(rows), [rows]);
 
   const move = async (leadId: string, stageId: string) => {
     const lead = local.find((l) => l.id === leadId);

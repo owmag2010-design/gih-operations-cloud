@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { ActionFeedback, LocalTime, SubmitButton } from "@/components/ui/forms";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/primitives";
+import type { ActionResult } from "@/server/errors";
 import { addLeadNoteAction, changeStageAction, convertLeadAction, markDuplicateAction, recordConsentAction } from "../../actions";
 
 export function StageSelect({ firmSlug, leadId, current, stages }: { firmSlug: string; leadId: string; current: string; stages: { id: string; name: string }[] }) {
@@ -72,8 +73,11 @@ export function NoteForm({ firmSlug, leadId }: { firmSlug: string; leadId: strin
 
 export function ConsentDialog({ firmSlug, leadId }: { firmSlug: string; leadId: string }) {
   const [open, setOpen] = useState(false);
-  const [state, action] = useActionState(recordConsentAction.bind(null, firmSlug, leadId), null);
-  useEffect(() => { if (state?.ok) setOpen(false); }, [state]);
+  const [state, action] = useActionState(async (prev: ActionResult | null, form: FormData) => {
+    const r = await recordConsentAction(firmSlug, leadId, prev, form);
+    if (r.ok) setOpen(false);
+    return r;
+  }, null);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm">Record</Button></DialogTrigger>

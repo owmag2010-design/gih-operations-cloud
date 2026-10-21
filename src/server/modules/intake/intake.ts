@@ -137,7 +137,7 @@ export async function routeIntakeItem(ctx: AccessContext, itemId: string, firmId
         firstName: item.firstName, lastName: item.lastName ?? undefined, email: item.email ?? undefined, phone: item.phone ?? undefined,
         nationality: item.nationality ?? undefined, currentCountry: item.currentCountry ?? undefined, destinationCountry: item.destinationCountry ?? undefined,
         immigrationCategory: item.immigrationCategory ?? undefined, enquiry: item.enquiry ?? undefined,
-        source: "hub_intake", sourceDetail: `Hub intake via ${item.source.replace(/_/g, " ")}`,
+        source: "hub_intake", sourceDetail: `Received by ${item.source.replace(/_/g, " ")}`,
         priority: item.flags.includes("urgent") ? "urgent" : "normal",
         tags: item.flags.filter((f) => f !== "possible_duplicate").join(","),
         consentContact: item.consentContact, consentMethod: "Given on the Hub enquiry",

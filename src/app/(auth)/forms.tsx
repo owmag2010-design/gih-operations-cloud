@@ -119,7 +119,7 @@ export function MfaSetup({ enabled, mandatory }: { enabled: boolean; mandatory: 
         <ul className="num grid grid-cols-2 gap-1.5 rounded-md border border-hairline bg-sunken p-3 font-medium tracking-wider text-ink">
           {state.data.codes.map((c) => <li key={c}>{c}</li>)}
         </ul>
-        <div><Button asChild variant="primary"><a href="/">Continue</a></Button></div>
+        <div><Button asChild variant="primary"><Link href="/">Continue</Link></Button></div>
       </div>
     );
   }

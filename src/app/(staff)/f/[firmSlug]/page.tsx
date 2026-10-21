@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { daysAgo } from "@/lib/time";
 import Link from "next/link";
 import { LocalTime } from "@/components/ui/forms";
 import { Button, EmptyState, PageHeader, Panel, PanelHeader } from "@/components/ui/primitives";
@@ -30,7 +31,7 @@ export default async function FirmDashboardPage({ params, searchParams }: PagePr
     );
   }
 
-  const since = new Date(Date.now() - Number(period) * 864e5);
+  const since = daysAgo(Number(period));
   const d = await firmDashboard(ctx, firm.firmId, since);
   const s = d.summary;
   const openStages = d.byStage.filter((x) => x.category === "open");

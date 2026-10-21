@@ -34,14 +34,12 @@ export function CommandPalette({ navigation, quickActions }: { navigation: Link[
   }, [open]);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setHits([]);
-      return;
-    }
+    if (query.trim().length < 2) return;
     const t = setTimeout(() => start(async () => setHits(await searchAction(query))), 180);
     return () => clearTimeout(t);
   }, [query]);
 
+  const shownHits = query.trim().length >= 2 ? hits : [];
   const go = (href: string) => {
     setOpen(false);
     setQuery("");
@@ -75,10 +73,10 @@ export function CommandPalette({ navigation, quickActions }: { navigation: Link[
             />
             <Command.List className="max-h-[50vh] overflow-y-auto p-1.5">
               {pending ? <Command.Loading><p className="px-2.5 py-2 text-[13px] text-muted">Searching…</p></Command.Loading> : null}
-              {query.trim().length >= 2 && !pending && hits.length === 0 ? <p className="px-2.5 py-2 text-[13px] text-muted">No records match “{query.trim()}”.</p> : null}
-              {hits.length ? (
+              {query.trim().length >= 2 && !pending && shownHits.length === 0 ? <p className="px-2.5 py-2 text-[13px] text-muted">No records match “{query.trim()}”.</p> : null}
+              {shownHits.length ? (
                 <Command.Group heading="Records" className={group}>
-                  {hits.map((h) => (
+                  {shownHits.map((h) => (
                     <Command.Item key={`${h.kind}-${h.id}`} value={`${h.kind}-${h.id}`} onSelect={() => go(h.href)} className={item}>
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{h.title}</span>

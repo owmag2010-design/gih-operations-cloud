@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 import type { ActionResult } from "@/server/errors";
@@ -52,15 +52,18 @@ function toLocalInput(d: Date) {
 }
 
 /** Renders a timestamp in the viewer's own time zone. */
+const noopSubscribe = () => () => {};
+
 export function LocalTime({ value, mode = "datetime" }: { value: Date | string | null | undefined; mode?: "datetime" | "date" | "relative" }) {
-  const [text, setText] = useState<string>("");
-  useEffect(() => {
-    if (!value) return;
-    const d = new Date(value);
-    if (mode === "relative") setText(relative(d));
-    else setText(d.toLocaleString("en-ZA", mode === "date" ? { day: "numeric", month: "short", year: "numeric" } : { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }));
-  }, [value, mode]);
+  // Format only in the browser so times show in the viewer's own time zone.
+  const isClient = useSyncExternalStore(noopSubscribe, () => true, () => false);
   if (!value) return <span className="text-muted/70">—</span>;
+  const d = new Date(value);
+  const text = !isClient
+    ? ""
+    : mode === "relative"
+      ? relative(d)
+      : d.toLocaleString("en-ZA", mode === "date" ? { day: "numeric", month: "short", year: "numeric" } : { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
   return (
     <time dateTime={new Date(value).toISOString()} suppressHydrationWarning className="num">
       {text || new Date(value).toISOString().slice(0, 10)}

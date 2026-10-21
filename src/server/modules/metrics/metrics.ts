@@ -106,6 +106,7 @@ export async function groupCommandCentre(ctx: AccessContext, opts: { since: Date
     bySource,
     intake,
     workload,
+    workloadAvailable: workloadFirms.length > 0,
   };
 }
 
