@@ -9,6 +9,7 @@ import { addLeadNote, assignLeads, changeStage, convertLead, createLead, deleteL
 import { createSavedView, deleteSavedView } from "@/server/modules/crm/views";
 import { addDepartment, addStage, moveStage, updateFirmPolicies, updateFirmProfile, updateStage } from "@/server/modules/org/firms";
 import { changeFirmRole, removeFirmMembership, updateMembershipDetails } from "@/server/modules/people/people";
+import { createService, updateService } from "@/server/modules/services/services";
 import { requireFirm } from "@/server/next/session";
 
 const data = (f: FormData) => Object.fromEntries([...f.keys()].map((k) => [k, f.getAll(k).length > 1 ? f.getAll(k).map(String) : String(f.get(k))]));
@@ -300,4 +301,40 @@ export async function addDepartmentAction(slug: string, _: ActionResult | null, 
   } catch (err) {
     return toActionError(err);
   }
+}
+
+/* ───────── Services and fees ───────── */
+
+function serviceInput(form: FormData) {
+  const labels = form.getAll("lineLabel").map(String);
+  const amounts = form.getAll("lineAmount").map(String);
+  const kinds = form.getAll("lineKind").map(String);
+  return {
+    name: str(form, "name"), category: str(form, "category"), jurisdiction: str(form, "jurisdiction"), currency: str(form, "currency"),
+    deposit: str(form, "deposit"), isActive: form.get("isActive") === "on", reason: str(form, "reason"),
+    lines: labels.map((label, i) => ({ label, amount: amounts[i] ?? "", kind: kinds[i] ?? "third_party" })),
+  };
+}
+
+export async function updateServiceAction(slug: string, serviceId: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    const { version } = await updateService(ctx, firm.firmId, serviceId, serviceInput(form));
+    revalidatePath(`/f/${slug}/settings`, "layout");
+    return { ok: true, message: `Saved as version ${version}.` };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+export async function createServiceAction(slug: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  let id: string;
+  try {
+    id = (await createService(ctx, firm.firmId, serviceInput(form))).id;
+  } catch (err) {
+    return toActionError(err);
+  }
+  revalidatePath(`/f/${slug}/settings`, "layout");
+  redirect(`/f/${slug}/settings/services/${id}`);
 }

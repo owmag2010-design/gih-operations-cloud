@@ -2,7 +2,7 @@ import type { AccessContext } from "@/server/access/context";
 
 export type NavItem = { label: string; href: string; icon: IconName; exact?: boolean };
 export type FutureItem = { label: string; release: number };
-export type IconName = "gauge" | "inbox" | "route" | "building" | "users" | "scroll" | "contact" | "user-round" | "settings" | "layout";
+export type IconName = "gauge" | "inbox" | "route" | "building" | "users" | "scroll" | "contact" | "user-round" | "settings" | "layout" | "file-text";
 
 export type Workspace = { kind: "hq" } | { kind: "firm"; slug: string; name: string; color: string };
 
@@ -18,7 +18,6 @@ export function hqNav(ctx: AccessContext): NavItem[] {
 }
 
 export const HQ_FUTURE: FutureItem[] = [
-  { label: "Proposals", release: 2 },
   { label: "Cases", release: 3 },
   { label: "Documents", release: 4 },
   { label: "Knowledge Centre", release: 5 },
@@ -32,6 +31,7 @@ export function firmNav(ctx: AccessContext, firmId: string, slug: string): NavIt
   const base = `/f/${slug}`;
   const items: NavItem[] = [{ label: "Dashboard", href: base, icon: "layout", exact: true }];
   if (ctx.has("leads:view_all", firmId) || ctx.has("leads:view_assigned", firmId)) items.push({ label: "Leads", href: `${base}/leads`, icon: "contact" });
+  if (ctx.has("proposals:view", firmId)) items.push({ label: "Proposals", href: `${base}/proposals`, icon: "file-text" });
   if (ctx.has("clients:view_all", firmId) || ctx.has("clients:view_assigned", firmId)) items.push({ label: "Clients", href: `${base}/clients`, icon: "user-round" });
   if (ctx.has("team:view", firmId)) items.push({ label: "Team", href: `${base}/team`, icon: "users" });
   if (ctx.has("firm:manage", firmId) || ctx.has("firm:view", firmId)) items.push({ label: "Settings", href: `${base}/settings`, icon: "settings" });
@@ -40,7 +40,6 @@ export function firmNav(ctx: AccessContext, firmId: string, slug: string): NavIt
 }
 
 export const FIRM_FUTURE: FutureItem[] = [
-  { label: "Proposals", release: 2 },
   { label: "Cases", release: 3 },
   { label: "Tasks", release: 3 },
   { label: "Documents", release: 4 },

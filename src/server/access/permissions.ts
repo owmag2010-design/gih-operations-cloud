@@ -41,6 +41,12 @@ export const FIRM_PERMISSIONS = [
   "clients:export",
   "metrics:firm",
   "audit:firm",
+  "services:manage",
+  "proposals:view",
+  "proposals:create",
+  "proposals:edit",
+  "proposals:approve",
+  "proposals:release",
 ] as const;
 
 export type GroupPermission = (typeof GROUP_PERMISSIONS)[number];
@@ -82,6 +88,12 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "clients:export": "Export clients",
   "metrics:firm": "View firm metrics",
   "audit:firm": "View firm audit log",
+  "services:manage": "Edit services and fees",
+  "proposals:view": "View proposals",
+  "proposals:create": "Create proposals",
+  "proposals:edit": "Edit draft proposals",
+  "proposals:approve": "Approve proposals",
+  "proposals:release": "Send proposals to clients",
 };
 
 export function isGroupPermission(p: string): p is GroupPermission {
@@ -123,6 +135,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
     permissions: [
       "firm:view", "team:view", "leads:view_all", "leads:create", "leads:edit", "leads:assign",
       "leads:convert", "clients:view_all", "clients:create", "clients:edit", "metrics:firm",
+      "proposals:view", "proposals:create", "proposals:edit",
     ],
   },
   {
@@ -130,14 +143,14 @@ export const DEFAULT_ROLES: RoleDef[] = [
     name: "Case Manager",
     scope: "firm",
     description: "Manages client matters.",
-    permissions: ["firm:view", "team:view", "leads:view_all", "leads:edit", "clients:view_all", "clients:edit", "metrics:firm"],
+    permissions: ["firm:view", "team:view", "leads:view_all", "leads:edit", "clients:view_all", "clients:edit", "metrics:firm", "proposals:view"],
   },
   {
     key: "reviewer",
     name: "Reviewer",
     scope: "firm",
     description: "Reviews work; read access.",
-    permissions: ["firm:view", "leads:view_all", "clients:view_all"],
+    permissions: ["firm:view", "leads:view_all", "clients:view_all", "proposals:view", "proposals:approve"],
   },
   {
     key: "document_officer",
@@ -150,8 +163,8 @@ export const DEFAULT_ROLES: RoleDef[] = [
     key: "finance_officer",
     name: "Finance Officer",
     scope: "firm",
-    description: "Billing and payments (Release 6).",
-    permissions: ["firm:view", "clients:view_all", "metrics:firm"],
+    description: "Billing, payments and the fee schedule.",
+    permissions: ["firm:view", "clients:view_all", "metrics:firm", "services:manage", "proposals:view"],
   },
   {
     key: "support_officer",

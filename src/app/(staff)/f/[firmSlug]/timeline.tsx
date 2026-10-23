@@ -19,6 +19,8 @@ function describe(item: Item, stageName: (id: string) => string) {
       return d.of ? `Marked as a duplicate of ${d.of}` : `Possible duplicate of ${((d.refs as string[]) ?? []).join(", ")}`;
     case "converted":
       return `Converted to client ${d.clientRef ?? ""}`;
+    case "proposal":
+      return `${item.body ?? "Proposal updated"}${d.ref && !(item.body ?? "").includes(String(d.ref)) ? ` (${d.ref})` : ""}`;
     case "created":
       return d.fromLead ? `Created from lead ${d.fromLead}` : "Created";
     default:
@@ -37,7 +39,7 @@ export function Timeline({ items, stages = [] }: { items: Item[]; stages?: { id:
           <span className={`mt-1.5 size-2 shrink-0 rounded-full ${item.type === "note" ? "bg-accent" : "bg-hairline-strong"}`} aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] text-ink-2">
-              <span className="font-medium text-ink">{item.actorName ?? "System"}</span>{" "}
+              <span className="font-medium text-ink">{item.actorName ?? (item.type === "proposal" ? "Client" : "System")}</span>{" "}
               {item.type === "note" ? "added a note" : describe(item, stageName).replace(/^./, (c) => c.toLowerCase())}
               <span className="ml-2 text-xs text-muted"><LocalTime value={item.createdAt} mode="relative" /></span>
             </p>

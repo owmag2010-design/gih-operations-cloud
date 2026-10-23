@@ -64,6 +64,17 @@ export const activityType = pgEnum("activity_type", [
   "duplicate_flagged",
   "converted",
   "routed",
+  "proposal",
+]);
+export const proposalStatus = pgEnum("proposal_status", [
+  "draft",
+  "in_review",
+  "changes_requested",
+  "approved",
+  "released",
+  "accepted",
+  "declined",
+  "withdrawn",
 ]);
 export const consentPurpose = pgEnum("consent_purpose", ["contact", "data_processing", "marketing"]);
 export const intakeStatus = pgEnum("intake_status", ["new", "routed", "held", "rejected", "duplicate"]);
@@ -444,6 +455,127 @@ export const services = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex("services_firm_code_uq").on(t.firmId, t.code)],
+);
+
+/** Every price a service has had. Proposals record the version they quoted. */
+export const servicePriceVersions = pgTable(
+  "service_price_versions",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id").notNull(),
+    version: integer("version").notNull(),
+    name: text("name").notNull(),
+    currency: text("currency").notNull(),
+    totalMinor: integer("total_minor").notNull(),
+    depositMinor: integer("deposit_minor").notNull(),
+    lines: jsonb("lines").$type<ServiceLine[]>().notNull().default([]),
+    addOns: jsonb("add_ons").$type<ServiceAddOn[]>().notNull().default([]),
+    isActive: boolean("is_active").notNull(),
+    reason: text("reason"),
+    changedById: uuid("changed_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("service_price_versions_uq").on(t.serviceId, t.version), index("service_price_versions_firm_idx").on(t.firmId)],
+);
+
+/* ───────────────────────── Proposals ───────────────────────── */
+
+export type ProposalSection = { key: string; title: string; body: string };
+
+export const proposals = pgTable(
+  "proposals",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    ref: text("ref").notNull(),
+    leadId: uuid("lead_id").notNull(),
+    title: text("title").notNull(),
+    status: proposalStatus("status").notNull().default("draft"),
+    version: integer("version").notNull().default(1),
+    recipientName: text("recipient_name").notNull(),
+    recipientEmail: citext("recipient_email"),
+    currency: text("currency").notNull().default("ZAR"),
+    totalMinor: integer("total_minor").notNull().default(0),
+    depositMinor: integer("deposit_minor").notNull().default(0),
+    sections: jsonb("sections").$type<ProposalSection[]>().notNull().default([]),
+    validDays: integer("valid_days").notNull().default(14),
+    reviewNote: text("review_note"),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    approvedById: uuid("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    releasedById: uuid("released_by_id").references(() => users.id, { onDelete: "set null" }),
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+    linkTokenHash: text("link_token_hash"),
+    linkExpiresAt: timestamp("link_expires_at", { withTimezone: true }),
+    firstViewedAt: timestamp("first_viewed_at", { withTimezone: true }),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    responseName: text("response_name"),
+    responseIp: text("response_ip"),
+    responseNote: text("response_note"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("proposals_firm_ref_uq").on(t.firmId, t.ref),
+    uniqueIndex("proposals_link_token_uq").on(t.linkTokenHash),
+    index("proposals_firm_lead_idx").on(t.firmId, t.leadId),
+    index("proposals_firm_status_idx").on(t.firmId, t.status, t.updatedAt),
+  ],
+);
+
+export const proposalItems = pgTable(
+  "proposal_items",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    proposalId: uuid("proposal_id").notNull(),
+    position: integer("position").notNull(),
+    serviceId: uuid("service_id"),
+    servicePriceVersion: integer("service_price_version"),
+    label: text("label").notNull(),
+    description: text("description"),
+    quantity: integer("quantity").notNull().default(1),
+    unitMinor: integer("unit_minor").notNull(),
+    depositMinor: integer("deposit_minor").notNull().default(0),
+    lines: jsonb("lines").$type<ServiceLine[]>().notNull().default([]),
+    createdAt: createdAt(),
+  },
+  (t) => [index("proposal_items_proposal_idx").on(t.proposalId, t.position)],
+);
+
+/** Immutable record of what was sent: the client link always shows the released snapshot. */
+export type ProposalSnapshot = {
+  ref: string;
+  title: string;
+  version: number;
+  firm: { tradingName: string; legalName: string; brandColor: string; slug: string; contactEmail: string | null; contactPhone: string | null; website: string | null };
+  recipientName: string;
+  recipientEmail: string | null;
+  currency: string;
+  totalMinor: number;
+  depositMinor: number;
+  sections: ProposalSection[];
+  items: { label: string; description: string | null; quantity: number; unitMinor: number; depositMinor: number; lines: ServiceLine[] }[];
+  preparedBy: string | null;
+  releasedAt: string;
+  validUntil: string;
+};
+
+export const proposalVersions = pgTable(
+  "proposal_versions",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    proposalId: uuid("proposal_id").notNull(),
+    version: integer("version").notNull(),
+    snapshot: jsonb("snapshot").$type<ProposalSnapshot>().notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("proposal_versions_uq").on(t.proposalId, t.version)],
 );
 
 /* ───────────────────────── Hub intake ───────────────────────── */

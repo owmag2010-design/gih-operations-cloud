@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * with no session cookie. Real authentication and authorisation happen on the
  * server, close to the data (see src/server/next/session.ts).
  */
-const PUBLIC = [/^\/login/, /^\/invite\//, /^\/reset-password/, /^\/api\/intake\//, /^\/api\/health$/, /^\/_next\//, /^\/favicon/];
+const PUBLIC = [/^\/p\/[A-Za-z0-9_-]+(\/pdf)?$/, /^\/login/, /^\/invite\//, /^\/reset-password/, /^\/api\/intake\//, /^\/api\/health$/, /^\/_next\//, /^\/favicon/];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

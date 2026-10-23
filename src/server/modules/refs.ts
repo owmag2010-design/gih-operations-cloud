@@ -2,7 +2,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import type { Tx } from "../db/client";
 
-const KIND_LETTER = { lead: "L", client: "C" } as const;
+const KIND_LETTER = { lead: "L", client: "C", proposal: "P" } as const;
 
 /**
  * Next human-readable reference for a firm, e.g. MG-L-000042.

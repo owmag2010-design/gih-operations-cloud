@@ -3,7 +3,11 @@ import { Badge, EmptyState, Facts, PageHeader, Panel, PanelHeader, tableClass as
 import { countryName } from "@/lib/countries";
 import { formatMoney } from "@/lib/labels";
 import { listStages } from "@/server/modules/crm/leads";
-import { getFirmForSettings, listServices } from "@/server/modules/org/firms";
+import { getFirmForSettings } from "@/server/modules/org/firms";
+import { listCatalogue } from "@/server/modules/services/services";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/primitives";
 import { requireFirm } from "@/server/next/session";
 import { DepartmentForm, PoliciesForm, ProfileForm, StageEditor } from "./client";
 
@@ -13,9 +17,10 @@ export default async function SettingsPage({ params }: PageProps<"/f/[firmSlug]/
   const { firmSlug } = await params;
   const { ctx, firm: access } = await requireFirm(firmSlug);
   const { firm, offices, departments } = await getFirmForSettings(ctx, access.firmId);
-  const [stages, services] = await Promise.all([listStages(ctx, firm.id, true), listServices(ctx, firm.id)]);
+  const [stages, services] = await Promise.all([listStages(ctx, firm.id, true), listCatalogue(ctx, firm.id)]);
   const canManage = ctx.has("firm:manage", firm.id);
   const canEditProfile = canManage || ctx.has("firms:edit");
+  const canEditFees = ctx.has("services:manage", firm.id);
 
   return (
     <>
@@ -71,26 +76,30 @@ export default async function SettingsPage({ params }: PageProps<"/f/[firmSlug]/
           </Panel>
         </div>
 
-        <Panel>
-          <PanelHeader title="Service catalogue and fees" description={services.length ? `${services.length} services from ${services[0].sourceNote ?? "the fee schedule"}. Totals are core fees; add-ons are charged only when needed. Editing arrives with proposals in Release 2.` : undefined} />
+        <Panel id="services">
+          <PanelHeader
+            title="Service catalogue and fees"
+            description={services.length ? `${services.length} services. Totals are core fees; add-ons are charged only when needed. ${canEditFees ? "Open a service to change its fees; every change is kept as a price version." : "Only firm administrators and finance officers can change fees."}` : undefined}
+            actions={canEditFees ? <Button asChild size="sm" variant="secondary"><Link href={`/f/${firm.slug}/settings/services/new`}><Plus /> Add service</Link></Button> : undefined}
+          />
           {services.length === 0 ? (
             <EmptyState title="No fees configured for this firm yet">Fees are loaded from the approved fee schedule. Send the confirmed schedule for this firm and it will be added.</EmptyState>
           ) : (
             <div className={t.wrap}>
               <table className={t.table}>
-                <thead><tr><th className={t.th}>Service</th><th className={t.th}>Group</th><th className={`${t.th} text-right`}>Total</th><th className={`${t.th} text-right`}>Deposit</th><th className={t.th}>Add-ons</th></tr></thead>
+                <thead><tr><th className={t.th}>Service</th><th className={t.th}>Group</th><th className={t.th}>Version</th><th className={`${t.th} text-right`}>Total</th><th className={`${t.th} text-right`}>Deposit</th><th className={t.th}>Add-ons</th></tr></thead>
                 <tbody>
                   {services.map((s) => (
                     <tr key={s.id} className={t.row}>
                       <td className={t.td}>
-                        <details>
-                          <summary className="cursor-pointer text-ink">{s.name}</summary>
-                          <ul className="mt-1.5 mb-1 text-xs text-muted">
-                            {s.lines.map((l) => <li key={l.label} className="num">{l.label}: {formatMoney(l.amountMinor, s.currency)}</li>)}
-                          </ul>
-                        </details>
+                        <Link href={`/f/${firm.slug}/settings/services/${s.id}`} className="text-ink underline-offset-2 hover:underline">{s.name}</Link>
+                        {s.isActive ? null : <Badge tone="outline" className="ml-1.5">Not offered</Badge>}
+                        <ul className="mt-1 text-xs text-muted">
+                          {s.lines.map((l) => <li key={l.label} className="num">{l.label}: {formatMoney(l.amountMinor, s.currency)}</li>)}
+                        </ul>
                       </td>
                       <td className={`${t.td} text-ink-2`}>{s.category}</td>
+                      <td className={`${t.td} num text-ink-2`}>v{s.version}</td>
                       <td className={`${t.td} num text-right`}>{formatMoney(s.totalMinor, s.currency)}</td>
                       <td className={`${t.td} num text-right text-ink-2`}>{formatMoney(s.depositMinor, s.currency)}</td>
                       <td className={`${t.td} max-w-[280px] text-xs text-muted`}>{s.addOns.map((a) => `${a.label}${a.amountMinor != null ? ` ${formatMoney(a.amountMinor, s.currency)}` : ` (${(a.note ?? "TBC").toLowerCase()})`}`).join("; ") || "None"}</td>

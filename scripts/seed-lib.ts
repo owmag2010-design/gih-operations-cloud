@@ -142,6 +142,11 @@ export async function runSeed(db: NodePgDatabase<typeof s>, log: (m: string) => 
           .onConflictDoNothing();
       }
     }
+    // Every service starts its price history at version 1.
+    await tx.execute(sql`
+      insert into service_price_versions (firm_id, service_id, version, name, currency, total_minor, deposit_minor, lines, add_ons, is_active, reason, created_at)
+      select s.firm_id, s.id, 1, s.name, s.currency, s.total_minor, s.deposit_minor, s.lines, s.add_ons, s.is_active, coalesce(s.source_note, 'Initial fee schedule'), s.created_at
+      from services s where not exists (select 1 from service_price_versions v where v.service_id = s.id)`);
     const warnings = parsed.filter((p) => p.warnings.length);
     log(`  services: ${parsed.length} per firm (${warnings.length} with notes)`);
     for (const w of warnings) log(`    ! ${w.name}: ${w.warnings.join(" ")}`);

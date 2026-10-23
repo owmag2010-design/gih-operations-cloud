@@ -16,6 +16,7 @@ import {
   Settings,
   UserRound,
   Users,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -28,7 +29,7 @@ import type { FutureItem, IconName, NavItem } from "./nav";
 
 const ICONS: Record<IconName, React.ComponentType<{ className?: string }>> = {
   gauge: Gauge, inbox: Inbox, route: Route, building: Building2, users: Users, scroll: ScrollText,
-  contact: Contact, "user-round": UserRound, settings: Settings, layout: LayoutDashboard,
+  contact: Contact, "user-round": UserRound, settings: Settings, layout: LayoutDashboard, "file-text": FileText,
 };
 
 export function SidebarNav({ items, future }: { items: NavItem[]; future: FutureItem[] }) {
