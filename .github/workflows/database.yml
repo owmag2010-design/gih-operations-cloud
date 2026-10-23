@@ -16,10 +16,10 @@ on:
       task:
         description: "What to run"
         type: choice
-        options: [migrate-and-seed, migrate, create-admin]
+        options: [migrate-and-seed, migrate, create-admin, reset-mfa]
         default: migrate-and-seed
       admin_email:
-        description: "create-admin only: email of the first administrator"
+        description: "create-admin / reset-mfa: the person's email"
         required: false
       admin_name:
         description: "create-admin only: full name"
@@ -48,7 +48,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Migrate
-        if: github.event_name == 'push' || inputs.task != 'create-admin'
+        if: github.event_name == 'push' || (inputs.task != 'create-admin' && inputs.task != 'reset-mfa')
         run: npx tsx scripts/migrate.ts
       - name: Seed configuration
         if: github.event_name == 'push' || inputs.task == 'migrate-and-seed'
@@ -59,3 +59,8 @@ jobs:
           ADMIN_EMAIL: ${{ inputs.admin_email }}
           ADMIN_NAME: ${{ inputs.admin_name }}
         run: npx tsx scripts/create-admin.ts --email "$ADMIN_EMAIL" --name "$ADMIN_NAME" --firm-admin-all
+      - name: Reset two-step sign-in
+        if: github.event_name == 'workflow_dispatch' && inputs.task == 'reset-mfa'
+        env:
+          ADMIN_EMAIL: ${{ inputs.admin_email }}
+        run: npx tsx scripts/reset-mfa.ts --email "$ADMIN_EMAIL"
