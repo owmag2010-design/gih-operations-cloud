@@ -1,0 +1,1 @@
+ALTER TABLE "mailboxes" ALTER COLUMN "inbound_address" DROP NOT NULL;

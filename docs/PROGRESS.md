@@ -1,5 +1,19 @@
 # Progress Log
 
+## 24 Oct 2026: Milestone 1 of the expanded brief: email workspace and navigation
+**Done (tested):**
+- Navigation rebuilt around the eleven workspaces (Overview, Inbox, Enquiries & Deals, Clients & Matters, Tasks & Calendar, Documents & Templates, Proposals & Finance, Knowledge & Updates, Content, Reports, Settings). Unbuilt ones are marked "Soon" and open an honest page saying what's coming and when.
+- One Inbox across every mailbox a person may read (Hub and each practice), with filters (practice, mailbox, assignee, status, linked, unread), search including message text, drafts, internal notes (styled apart, never sent), assignment, linking to enquiries and clients, "create enquiry from this email", delivery and failure states (accepted vs delivered).
+- Compose, reply, reply all and forward with To/CC/BCC, attachments, templates with editable sections, missing-field checks, desktop/mobile/plain-text preview, autosaved private drafts. The sending address is always shown.
+- Mailbox connections for Microsoft 365 (Graph) and Gmail (Gmail API) by OAuth: encrypted tokens, signed state bound to the browser, connection health and reconnect, 90-day history import with progress and de-duplication, provider thread ids, sync every 5 minutes (Vercel Cron) plus "Sync now", sending through the provider (counts as sent only when the provider accepts), attachment download on demand. Personal mailboxes are private to their owner, enforced in the database too.
+- HTML template library: 8 Hub designs taken from emails already sent through Resend (anonymised) and 2 Veritas plain templates; HTML is sanitised; `{{edit:…}}` sections; merge fields checked on save and before sending; generated plain-text version.
+- Signatures per practice and per person, chosen automatically, exactly one per message, with live preview.
+- 88 unit/integration and 9 end-to-end tests passing.
+
+**Blocked on Owen:** Azure app registration (Microsoft 365), Google OAuth client (Gmail), `CRON_SECRET` in Vercel. Steps in `10-deployment.md`.
+
+**Next (milestone 2):** Airtable mirror and reconciliation, matters under clients, tasks, notes and calendar.
+
 ## 23 Oct 2026: Hub branding, email, and Release 2 proposals (first pass)
 **Done (branch `release-2-proposals`, tested):**
 - Global Immigration Hub branding: official logo (from the Hub's Logo folder), website v4 palette (navy #1B263B, red #DD1929), Newsreader display type, branded sign-in.

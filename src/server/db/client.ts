@@ -36,6 +36,8 @@ export type Scope = {
   firmIds: readonly string[];
   intake?: boolean;
   auditScope?: "org" | "firm" | "";
+  /** Mail sync and inbound webhooks: may read personal mailboxes' conversations. Never set from a user request. */
+  mailSystem?: boolean;
 };
 
 /**
@@ -53,7 +55,8 @@ export async function withScope<T>(scope: Scope, fn: (tx: Tx) => Promise<T>): Pr
       set_config('app.user_id', ${scope.userId ?? ""}, true),
       set_config('app.firm_ids', ${scope.firmIds.join(",")}, true),
       set_config('app.intake', ${scope.intake ? "on" : "off"}, true),
-      set_config('app.audit_scope', ${scope.auditScope ?? ""}, true)`);
+      set_config('app.audit_scope', ${scope.auditScope ?? ""}, true),
+      set_config('app.mail_system', ${scope.mailSystem ? "on" : "off"}, true)`);
     return fn(tx);
   });
 }

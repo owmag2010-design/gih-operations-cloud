@@ -6,7 +6,9 @@ export type ResendSend = {
   from: string;
   to: string[];
   cc?: string[];
+  bcc?: string[];
   replyTo?: string;
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
   subject: string;
   html: string;
   text: string;
@@ -36,6 +38,8 @@ export async function resendSend(msg: ResendSend): Promise<ResendResult> {
         from: msg.from,
         to: msg.to,
         cc: msg.cc?.length ? msg.cc : undefined,
+        bcc: msg.bcc?.length ? msg.bcc : undefined,
+        attachments: msg.attachments?.length ? msg.attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64"), content_type: a.contentType })) : undefined,
         reply_to: msg.replyTo,
         subject: msg.subject,
         html: msg.html,
@@ -98,4 +102,17 @@ export function verifyWebhook(raw: string, h: { id: string | null; timestamp: st
     const got = Buffer.from(sig, "base64");
     return got.length === expected.length && timingSafeEqual(got, expected);
   });
+}
+
+/** Download one attachment of a received email (for storing it in the dashboard). */
+export async function resendGetReceivedAttachment(emailId: string, attachmentId: string): Promise<{ data: Buffer; contentType: string; filename: string } | null> {
+  const key = env().RESEND_API_KEY;
+  if (!key || !/^[0-9a-f-]{36}$/i.test(emailId) || !/^[0-9a-zA-Z_-]{1,80}$/.test(attachmentId)) return null;
+  const res = await fetch(`https://api.resend.com/emails/receiving/${emailId}/attachments/${attachmentId}`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) return null;
+  const meta = (await res.json()) as { download_url?: string; filename?: string; content_type?: string };
+  if (!meta.download_url) return null;
+  const file = await fetch(meta.download_url, { signal: AbortSignal.timeout(30_000) });
+  if (!file.ok) return null;
+  return { data: Buffer.from(await file.arrayBuffer()), contentType: meta.content_type ?? "application/octet-stream", filename: meta.filename ?? "attachment" };
 }

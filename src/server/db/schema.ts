@@ -84,6 +84,11 @@ export const consentPurpose = pgEnum("consent_purpose", ["contact", "data_proces
 export const intakeStatus = pgEnum("intake_status", ["new", "routed", "held", "rejected", "duplicate"]);
 export const routingAction = pgEnum("routing_action", ["route", "hold", "consult"]);
 export const emailStatus = pgEnum("email_status", ["sent", "not_configured", "failed"]);
+export const mailboxKind = pgEnum("mailbox_kind", ["shared", "personal"]);
+export const mailProvider = pgEnum("mail_provider", ["forwarding", "microsoft", "google"]);
+export const mailConnectionStatus = pgEnum("mail_connection_status", ["connected", "needs_reconnect", "error", "disconnected"]);
+export const templateFormat = pgEnum("template_format", ["blocks", "html"]);
+export const draftMode = pgEnum("email_draft_mode", ["new", "reply", "reply_all", "forward"]);
 
 /* ───────────────────── Organisation ───────────────────── */
 
@@ -685,12 +690,18 @@ export const mailboxes = pgTable(
     orgId: uuid("org_id").notNull().references(() => organisations.id),
     firmId: uuid("firm_id").references(() => firms.id),
     label: text("label").notNull(),
-    inboundAddress: citext("inbound_address").notNull(),
+    /** Forwarding address at the Resend receiving domain; null for a mailbox that only syncs with its provider. */
+    inboundAddress: citext("inbound_address"),
     forwardedFrom: text("forwarded_from"),
     fromName: text("from_name").notNull(),
     fromAddress: citext("from_address").notNull(),
     signature: text("signature"),
     isActive: boolean("is_active").notNull().default(true),
+    /** shared: everyone with inbox access in the firm (or Hub); personal: the owner and members only. */
+    kind: mailboxKind("kind").notNull().default("shared"),
+    ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "set null" }),
+    /** How mail gets in and out: forwarding (Resend) or a connected provider mailbox. */
+    provider: mailProvider("provider").notNull().default("forwarding"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -705,6 +716,8 @@ export type EmailBlock =
   | { type: "notice"; text: string }
   | { type: "divider" };
 
+export type TemplateSlot = { key: string; label: string; default: string; multiline: boolean };
+
 export const emailTemplates = pgTable(
   "email_templates",
   {
@@ -716,6 +729,14 @@ export const emailTemplates = pgTable(
     subject: text("subject").notNull(),
     preheader: text("preheader"),
     blocks: jsonb("blocks").$type<EmailBlock[]>().notNull().default([]),
+    /** blocks: built in the editor; html: imported HTML (sanitised) with editable slots. */
+    format: templateFormat("format").notNull().default("blocks"),
+    html: text("html"),
+    /** Editable regions in an HTML template: {{edit:key}} in the HTML. */
+    slots: jsonb("slots").$type<TemplateSlot[]>().notNull().default([]),
+    /** Optional hand-written plain-text version; generated from the HTML when empty. */
+    textOverride: text("text_override"),
+    sourceNote: text("source_note"),
     isActive: boolean("is_active").notNull().default(true),
     version: integer("version").notNull().default(1),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
@@ -743,16 +764,19 @@ export const emailThreads = pgTable(
     unread: boolean("unread").notNull().default(false),
     assignedToId: uuid("assigned_to_id").references(() => users.id, { onDelete: "set null" }),
     lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Provider conversation id (Microsoft conversationId, Gmail threadId). */
+    providerThreadId: text("provider_thread_id"),
     createdAt: createdAt(),
   },
   (t) => [
+    index("email_threads_provider_idx").on(t.mailboxId, t.providerThreadId),
     index("email_threads_firm_last_idx").on(t.firmId, t.lastMessageAt),
     index("email_threads_org_last_idx").on(t.orgId, t.lastMessageAt),
     index("email_threads_counterpart_idx").on(t.counterpartEmail),
   ],
 );
 
-export type EmailAttachmentMeta = { id: string; filename: string; contentType: string; size: number | null };
+export type EmailAttachmentMeta = { id: string; filename: string; contentType: string; size: number | null; fileId?: string | null; inline?: boolean };
 
 export const emailMessages = pgTable(
   "email_messages",
@@ -770,6 +794,7 @@ export const emailMessages = pgTable(
     fromName: text("from_name"),
     toAddresses: text("to_addresses").array().notNull().default(sql`'{}'::text[]`),
     ccAddresses: text("cc_addresses").array().notNull().default(sql`'{}'::text[]`),
+    bccAddresses: text("bcc_addresses").array().notNull().default(sql`'{}'::text[]`),
     subject: text("subject").notNull(),
     textBody: text("text_body"),
     htmlBody: text("html_body"),
@@ -778,6 +803,12 @@ export const emailMessages = pgTable(
     authResult: text("auth_result"),
     error: text("error"),
     sentById: uuid("sent_by_id").references(() => users.id, { onDelete: "set null" }),
+    /** Which route carried it: resend, microsoft, google. */
+    via: text("via"),
+    /** When the provider accepted it (sent) — not the same as delivered. */
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    /** For mail found by mailbox sync: the provider's own timestamp. */
+    providerDate: timestamp("provider_date", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
@@ -785,4 +816,152 @@ export const emailMessages = pgTable(
     uniqueIndex("email_messages_provider_uq").on(t.providerId),
     index("email_messages_message_id_idx").on(t.messageId),
   ],
+);
+
+/* ───────────────────────── Email: connections, members, notes, drafts, signatures, files ───────────────────────── */
+
+export type MailSyncCursor = { inboxDelta?: string; sentDelta?: string; historyId?: string };
+export type MailImportState = {
+  since: string;
+  phase: "inbox" | "sent" | "done";
+  pageToken?: string | null;
+  imported: number;
+  skipped: number;
+  startedAt: string;
+  finishedAt?: string | null;
+};
+
+/** A provider mailbox connected with OAuth. Tokens are encrypted with DATA_ENCRYPTION_KEY. */
+export const mailConnections = pgTable(
+  "mail_connections",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    mailboxId: uuid("mailbox_id").notNull().references(() => mailboxes.id, { onDelete: "cascade" }),
+    provider: mailProvider("provider").notNull(),
+    accountEmail: citext("account_email").notNull(),
+    accessTokenEnc: text("access_token_enc"),
+    refreshTokenEnc: text("refresh_token_enc"),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    scopes: text("scopes"),
+    status: mailConnectionStatus("status").notNull().default("connected"),
+    syncCursor: jsonb("sync_cursor").$type<MailSyncCursor>().notNull().default({}),
+    importState: jsonb("import_state").$type<MailImportState | null>(),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    failureCount: integer("failure_count").notNull().default(0),
+    connectedById: uuid("connected_by_id").references(() => users.id, { onDelete: "set null" }),
+    connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("mail_connections_mailbox_uq").on(t.mailboxId)],
+);
+
+/** Extra people who may use a personal mailbox (the owner always can). */
+export const mailboxMembers = pgTable(
+  "mailbox_members",
+  {
+    mailboxId: uuid("mailbox_id").notNull().references(() => mailboxes.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    canSend: boolean("can_send").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.mailboxId, t.userId] })],
+);
+
+/** Internal notes on a conversation. Never sent to the client. */
+export const emailNotes = pgTable(
+  "email_notes",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    threadId: uuid("thread_id").notNull().references(() => emailThreads.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("email_notes_thread_idx").on(t.threadId, t.createdAt)],
+);
+
+/** Unsent messages. Private to their author. */
+export const emailDrafts = pgTable(
+  "email_drafts",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    mailboxId: uuid("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
+    threadId: uuid("thread_id").references(() => emailThreads.id, { onDelete: "cascade" }),
+    replyToMessageId: uuid("reply_to_message_id"),
+    mode: draftMode("mode").notNull().default("new"),
+    toAddresses: text("to_addresses").array().notNull().default(sql`'{}'::text[]`),
+    ccAddresses: text("cc_addresses").array().notNull().default(sql`'{}'::text[]`),
+    bccAddresses: text("bcc_addresses").array().notNull().default(sql`'{}'::text[]`),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull().default(""),
+    templateId: uuid("template_id").references(() => emailTemplates.id, { onDelete: "set null" }),
+    slotValues: jsonb("slot_values").$type<Record<string, string>>().notNull().default({}),
+    fieldValues: jsonb("field_values").$type<Record<string, string>>().notNull().default({}),
+    attachmentFileIds: uuid("attachment_file_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    leadId: uuid("lead_id"),
+    clientId: uuid("client_id"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("email_drafts_user_idx").on(t.userId, t.updatedAt)],
+);
+
+/**
+ * Email signatures. firm_id null = Hub; user_id null = the practice's default.
+ * The sender's own signature for that practice wins over the practice default.
+ */
+export const emailSignatures = pgTable(
+  "email_signatures",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    fullName: text("full_name"),
+    role: text("role"),
+    phone: text("phone"),
+    email: text("email"),
+    website: text("website"),
+    bookingUrl: text("booking_url"),
+    disclaimer: text("disclaimer"),
+    showLogo: boolean("show_logo").notNull().default(true),
+    isActive: boolean("is_active").notNull().default(true),
+    updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("email_signatures_scope_idx").on(t.orgId, t.firmId, t.userId)],
+);
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+/**
+ * Stored files (email attachments for now). Kept in the database until object
+ * storage is configured; size-capped by the services that write them.
+ */
+export const storedFiles = pgTable(
+  "stored_files",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    filename: text("filename").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    sha256: text("sha256").notNull(),
+    data: bytea("data").notNull(),
+    source: text("source").notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("stored_files_scope_idx").on(t.orgId, t.firmId)],
 );

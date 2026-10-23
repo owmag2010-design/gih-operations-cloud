@@ -27,3 +27,20 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L22 | Inbound mail from a thread tag is trusted to identify the conversation | A sender who learns a tagged address could post into that conversation | Acceptable: the tag is a random 128-bit id; messages show the real sender |
 | L23 | A proposal's author may also approve it (recorded in the audit log as self-approval) | No enforced four-eyes check | Add a firm policy to require a different approver once teams grow |
 | L24 | New Hub email senders are recorded without contact consent; staff confirm consent when routing | Consent must be captured manually | Add a consent prompt in Hub intake |
+
+## Added 24 Oct 2026 (milestone 1: email workspace)
+
+| # | Limitation | Impact | Plan |
+|---|---|---|---|
+| L25 | Microsoft 365 and Gmail connections need one-time app registrations (Azure / Google Cloud) and their secrets in Vercel | Until then the Connect buttons say "not set up"; mail arrives only by forwarding | Owen registers the apps (see 10-deployment.md) |
+| L26 | Mailbox sync is pull-based: every 5 minutes by Vercel Cron (needs `CRON_SECRET`) and on "Sync now". No Graph subscriptions or Gmail push yet | New mail can take up to 5 minutes to appear; without `CRON_SECRET` only "Sync now" syncs | Add push notifications with renewal once volumes justify it |
+| L27 | History import covers the last 90 days of Inbox and Sent | Older mail stays in the provider | Make the window configurable per mailbox |
+| L28 | Deleting or moving a message in Outlook/Gmail doesn't remove it here (records are kept; no silent deletion) | The dashboard can show mail since deleted in the mailbox | Show a "removed in mailbox" marker from the delta feed |
+| L29 | Attachments: up to 4 MB per file when uploading (hosting request limit), 18 MB per message; files are stored in PostgreSQL | Larger files must be shared as links | Move to object storage with direct uploads (milestone 3, documents) |
+| L30 | Compose is plain text with paragraphs (branded frame or plain); no rich-text editor yet | No inline formatting beyond **bold** in templates | Rich editor with the document workspace (milestone 3) |
+| L31 | Microsoft 365 and Gmail report acceptance only; "Delivered" appears only for mail sent through Resend | Provider-sent mail shows "Sent via …", never "Delivered" | Provider limitation |
+| L32 | Forwarding through Gmail or Resend doesn't carry the original attachments (Microsoft does) | Re-attach files when forwarding from those routes | Fetch and attach originals on forward |
+| L33 | "Create task from email" waits for Tasks & Calendar | Use an internal note for now | Milestone 2 |
+| L34 | Gmail's `gmail.modify` scope is "restricted": for personal Gmail accounts Google requires app verification; in testing mode refresh tokens expire after 7 days | Personal Gmail connections would need reconnecting weekly until verified | Use Google Workspace accounts (internal app) or complete verification |
+| L35 | Microsoft 365 bought through GoDaddy can block third-party app consent | Connecting hello@thegih.com may need GoDaddy/Microsoft admin consent | Grant admin consent in Entra ID; if blocked, keep forwarding for that mailbox |
+| L36 | Search matches subjects, people and message text with simple pattern matching | Fine at current volumes; slower at hundreds of thousands of messages | Full-text index when needed |

@@ -1,55 +1,69 @@
 import type { AccessContext } from "@/server/access/context";
 
-export type NavItem = { label: string; href: string; icon: IconName; exact?: boolean };
+/**
+ * Navigation: the same eleven workspaces in the Hub and in every practice, so
+ * people always find things in the same place. Secondary screens live inside
+ * a workspace (tabs), not in the sidebar. Workspaces that aren't built yet say
+ * so and when they arrive.
+ */
+
+export type IconName =
+  | "gauge" | "inbox" | "route" | "building" | "users" | "scroll" | "contact" | "user-round" | "settings" | "layout" | "file-text"
+  | "mail" | "templates" | "at-sign" | "calendar" | "folder" | "wallet" | "book" | "megaphone" | "chart";
+
+export type NavItem = { label: string; href: string; icon: IconName; exact?: boolean; soon?: string; match?: string[]; badge?: number };
+/** Kept for compatibility with older layouts; the new navigation lists everything. */
 export type FutureItem = { label: string; release: number };
-export type IconName = "gauge" | "inbox" | "route" | "building" | "users" | "scroll" | "contact" | "user-round" | "settings" | "layout" | "file-text" | "mail" | "templates" | "at-sign";
 
 export type Workspace = { kind: "hq" } | { kind: "firm"; slug: string; name: string; color: string };
 
-export function hqNav(ctx: AccessContext): NavItem[] {
+export const MODULES = {
+  tasks: { title: "Tasks & Calendar", milestone: 2, summary: "Personal, team and matter tasks with owners, due dates, reminders and recurring options; task templates by service and stage; calendar views for consultations, appointments, submissions, document expiry and deadlines; connected calendars." },
+  matters: { title: "Clients & Matters", milestone: 2, summary: "Matters under each client: applicants and dependants, service and legal category, status and expiry dates, checklists and documents, deadlines with their basis, fees, submission details and history. Verified facts kept apart from client statements and staff assessments." },
+  documents: { title: "Documents", milestone: 3, summary: "Drafting in the dashboard: client letters, representations, consultation reports, roadmaps and submission packs from branded templates, with version history, review and approval, DOCX and PDF export, and scanned uploads with OCR." },
+  finance: { title: "Proposals & Finance", milestone: 3, summary: "Invoices with numbering per entity, payment schedules, verified payment reconciliation, and operational reports of billed, received and outstanding amounts per practice. Proposals already work in each practice." },
+  knowledge: { title: "Knowledge & Updates", milestone: 4, summary: "A South African immigration library (Acts, regulations, Gazettes, DHA directives, judgments, VFS requirements) with status down to provision level, plus Zimbabwe developments; and a monitor of official sources with review before anything is published internally." },
+  content: { title: "Content", milestone: 4, summary: "Articles, updates, FAQs and resource pages for the Hub and practice websites, with review, scheduling and publishing only to a connected website." },
+  reports: { title: "Reports", milestone: 3, summary: "Workload, pipeline, conversion and finance reports per practice and across the group. Today: the Command Centre figures and the audit log." },
+  chat: { title: "Team chat", milestone: 4, summary: "Direct messages, practice channels and matter discussions, kept separate from client messaging." },
+} as const;
+export type ModuleKey = keyof typeof MODULES;
+
+const soon = (k: ModuleKey) => `/soon/${k}`;
+
+export function hqNav(ctx: AccessContext, opts: { unread?: number } = {}): NavItem[] {
   const items: NavItem[] = [];
-  if (ctx.has("metrics:group")) items.push({ label: "Command Centre", href: "/hq", icon: "gauge", exact: true });
-  if (ctx.has("intake:view")) items.push({ label: "Hub inbox", href: "/hq/inbox", icon: "mail" });
-  if (ctx.has("intake:view")) items.push({ label: "Hub intake", href: "/hq/intake", icon: "inbox" });
-  if (ctx.has("routing:manage") || ctx.has("intake:view")) items.push({ label: "Routing rules", href: "/hq/routing", icon: "route" });
-  if (ctx.has("firms:view")) items.push({ label: "Firms", href: "/hq/firms", icon: "building" });
-  if (ctx.has("staff:view")) items.push({ label: "People", href: "/hq/people", icon: "users" });
-  if (ctx.has("hub_templates:manage") || ctx.has("intake:view")) items.push({ label: "Email templates", href: "/hq/templates", icon: "templates" });
-  if (ctx.has("mailboxes:manage")) items.push({ label: "Email settings", href: "/hq/email", icon: "at-sign" });
-  if (ctx.has("audit:view")) items.push({ label: "Audit log", href: "/hq/audit", icon: "scroll" });
+  if (ctx.has("metrics:group")) items.push({ label: "Overview", href: "/hq", icon: "gauge", exact: true });
+  const anyInbox = ctx.has("intake:view") || [...ctx.firms.values()].some((f) => f.permissions.has("email:view"));
+  if (anyInbox) items.push({ label: "Inbox", href: "/inbox", icon: "inbox", badge: opts.unread });
+  if (ctx.has("intake:view")) items.push({ label: "Enquiries & Deals", href: "/hq/intake", icon: "contact", match: ["/hq/routing"] });
+  items.push({ label: "Clients & Matters", href: soon("matters"), icon: "user-round", soon: "Milestone 2" });
+  items.push({ label: "Tasks & Calendar", href: soon("tasks"), icon: "calendar", soon: "Milestone 2" });
+  if (ctx.has("hub_templates:manage") || ctx.has("intake:view")) items.push({ label: "Documents & Templates", href: "/hq/templates", icon: "folder", match: ["/settings/signatures"] });
+  items.push({ label: "Proposals & Finance", href: soon("finance"), icon: "wallet", soon: "Milestone 3" });
+  items.push({ label: "Knowledge & Updates", href: soon("knowledge"), icon: "book", soon: "Milestone 4" });
+  items.push({ label: "Content", href: soon("content"), icon: "megaphone", soon: "Milestone 4" });
+  if (ctx.has("audit:view") || ctx.has("metrics:group")) items.push({ label: "Reports", href: "/hq/audit", icon: "chart" });
+  if (ctx.has("firms:view") || ctx.has("staff:view") || ctx.has("mailboxes:manage") || ctx.has("routing:manage")) items.push({ label: "Settings", href: "/hq/settings", icon: "settings", match: ["/hq/firms", "/hq/people", "/hq/routing", "/hq/email", "/settings"] });
   return items;
 }
 
-export const HQ_FUTURE: FutureItem[] = [
-  { label: "Cases", release: 3 },
-  { label: "Documents", release: 4 },
-  { label: "Knowledge Centre", release: 5 },
-  { label: "WhatsApp", release: 6 },
-  { label: "Finance", release: 6 },
-  { label: "Automation Studio", release: 6 },
-  { label: "Analytics", release: 6 },
-];
+export const HQ_FUTURE: FutureItem[] = [];
 
-export function firmNav(ctx: AccessContext, firmId: string, slug: string): NavItem[] {
+export function firmNav(ctx: AccessContext, firmId: string, slug: string, opts: { unread?: number } = {}): NavItem[] {
   const base = `/f/${slug}`;
-  const items: NavItem[] = [{ label: "Dashboard", href: base, icon: "layout", exact: true }];
-  if (ctx.has("email:view", firmId)) items.push({ label: "Inbox", href: `${base}/inbox`, icon: "mail" });
-  if (ctx.has("leads:view_all", firmId) || ctx.has("leads:view_assigned", firmId)) items.push({ label: "Leads", href: `${base}/leads`, icon: "contact" });
-  if (ctx.has("proposals:view", firmId)) items.push({ label: "Proposals", href: `${base}/proposals`, icon: "file-text" });
-  if (ctx.has("clients:view_all", firmId) || ctx.has("clients:view_assigned", firmId)) items.push({ label: "Clients", href: `${base}/clients`, icon: "user-round" });
-  if (ctx.has("email:view", firmId) || ctx.has("templates:manage", firmId)) items.push({ label: "Email templates", href: `${base}/templates`, icon: "templates" });
-  if (ctx.has("team:view", firmId)) items.push({ label: "Team", href: `${base}/team`, icon: "users" });
-  if (ctx.has("firm:manage", firmId) || ctx.has("firm:view", firmId)) items.push({ label: "Settings", href: `${base}/settings`, icon: "settings" });
-  if (ctx.has("audit:firm", firmId)) items.push({ label: "Audit log", href: `${base}/audit`, icon: "scroll" });
+  const items: NavItem[] = [{ label: "Overview", href: base, icon: "layout", exact: true }];
+  if (ctx.has("email:view", firmId)) items.push({ label: "Inbox", href: `/inbox?practice=${firmId}`, icon: "inbox", match: [`${base}/inbox`], badge: opts.unread });
+  if (ctx.has("leads:view_all", firmId) || ctx.has("leads:view_assigned", firmId)) items.push({ label: "Enquiries & Deals", href: `${base}/leads`, icon: "contact" });
+  if (ctx.has("clients:view_all", firmId) || ctx.has("clients:view_assigned", firmId)) items.push({ label: "Clients & Matters", href: `${base}/clients`, icon: "user-round" });
+  items.push({ label: "Tasks & Calendar", href: soon("tasks"), icon: "calendar", soon: "Milestone 2" });
+  if (ctx.has("email:view", firmId) || ctx.has("templates:manage", firmId)) items.push({ label: "Documents & Templates", href: `${base}/templates`, icon: "folder" });
+  if (ctx.has("proposals:view", firmId)) items.push({ label: "Proposals & Finance", href: `${base}/proposals`, icon: "wallet" });
+  items.push({ label: "Knowledge & Updates", href: soon("knowledge"), icon: "book", soon: "Milestone 4" });
+  items.push({ label: "Content", href: soon("content"), icon: "megaphone", soon: "Milestone 4" });
+  if (ctx.has("audit:firm", firmId)) items.push({ label: "Reports", href: `${base}/audit`, icon: "chart" });
+  if (ctx.has("firm:manage", firmId) || ctx.has("firm:view", firmId)) items.push({ label: "Settings", href: `${base}/settings`, icon: "settings", match: [`${base}/team`, "/settings"] });
   return items;
 }
 
-export const FIRM_FUTURE: FutureItem[] = [
-  { label: "Cases", release: 3 },
-  { label: "Tasks", release: 3 },
-  { label: "Documents", release: 4 },
-  { label: "Knowledge", release: 5 },
-  { label: "WhatsApp", release: 6 },
-  { label: "Billing", release: 6 },
-  { label: "Reports", release: 6 },
-];
+export const FIRM_FUTURE: FutureItem[] = [];

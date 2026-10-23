@@ -1,0 +1,19 @@
+To: {{CLIENT_EMAIL}}
+Subject: {{MATTER}} — consultation (Ref {{REF}})
+
+Dear {{CLIENT_NAME}},
+
+{{ADVICE}}
+
+The best next step is a focused consultation:
+- 30-minute consultation: R850
+- 60-minute consultation (recommended): R1,700
+Both are on Microsoft Teams and, should you instruct us to proceed, are credited toward that work.
+
+To book, reply and we'll send you a secure online payment link for your chosen session, or pay by EFT. Please quote {{REF}}.
+
+Kind regards,
+Owen Magocha
+LLB · Corporate & Wealth Migration Strategist
+Veritas Emigrate
+cs@veritasemigrate.com · +27 12 140 0194

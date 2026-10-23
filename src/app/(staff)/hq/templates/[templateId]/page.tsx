@@ -15,7 +15,7 @@ export default async function HubTemplatePage({ params }: PageProps<"/hq/templat
   return (
     <>
       <PageHeader title={t.name} description={`Version ${t.version} · Shared with every partner firm`} />
-      <TemplateEditor scopeKey="hub" base="/hq" id={t.id} readOnly={!ctx.has("hub_templates:manage")} initial={{ name: t.name, category: t.category, subject: t.subject, preheader: t.preheader ?? "", isActive: t.isActive, blocks: t.blocks }} />
+      <TemplateEditor scopeKey="hub" base="/hq" id={t.id} readOnly={!ctx.has("hub_templates:manage")} initial={{ name: t.name, category: t.category, subject: t.subject, preheader: t.preheader ?? "", isActive: t.isActive, blocks: t.blocks, format: t.format, html: t.html, slots: t.slots, textOverride: t.textOverride }} />
     </>
   );
 }

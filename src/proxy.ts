@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * with no session cookie. Real authentication and authorisation happen on the
  * server, close to the data (see src/server/next/session.ts).
  */
-const PUBLIC = [/^\/p\/[A-Za-z0-9_-]+(\/pdf)?$/, /^\/login/, /^\/invite\//, /^\/reset-password/, /^\/api\/intake\//, /^\/api\/email\/webhook$/, /^\/api\/health$/, /^\/_next\//, /^\/favicon/, /^\/icon/, /^\/brand\//];
+const PUBLIC = [/^\/p\/[A-Za-z0-9_-]+(\/pdf)?$/, /^\/login/, /^\/invite\//, /^\/reset-password/, /^\/api\/intake\//, /^\/api\/email\/webhook$/, /^\/api\/cron\//, /^\/api\/health$/, /^\/_next\//, /^\/favicon/, /^\/icon/, /^\/brand\//];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -28,7 +28,7 @@ export function proxy(request: NextRequest) {
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
       `connect-src 'self'${dev ? " ws: wss:" : ""}`,
       "frame-ancestors 'none'",

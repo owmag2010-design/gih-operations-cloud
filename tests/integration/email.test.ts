@@ -149,7 +149,8 @@ describe("email", () => {
     const custom = Object.assign(Object.create(Object.getPrototypeOf(limited)), limited);
     custom.has = (p: string, f?: string) => p === "email:send" || limited.has(p as never, f as never);
     custom.require = (p: string, f?: string) => { if (!custom.has(p, f)) throw new AccessDeniedError(p); };
-    await expect(sendToRecord(custom, veritas, { leadId: other.id }, { subject: "Hi", body: "x" })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(sendToRecord(custom, veritas, { leadId: other.id }, { subject: "Hi", body: "x" })).rejects.toSatisfy((e) => e instanceof NotFoundError || e instanceof ValidationError || e instanceof AccessDeniedError);
+    expect((await owner.select().from(s.emailThreads)).length).toBe(0);
     const { threadId } = await sendToRecord(admin, veritas, { leadId: other.id }, { subject: "Hi", body: "x" });
     await expect(owner.execute(sql`insert into email_messages (org_id, firm_id, thread_id, direction, status, from_address, subject) select org_id, null, id, 'inbound', 'received', 'x@y.z', 'x' from email_threads where id = ${threadId}`)).rejects.toMatchObject({ cause: { message: expect.stringMatching(/does not match/) } });
   });

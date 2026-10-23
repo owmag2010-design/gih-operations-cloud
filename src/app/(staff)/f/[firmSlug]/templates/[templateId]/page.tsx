@@ -18,7 +18,7 @@ export default async function FirmTemplatePage({ params }: PageProps<"/f/[firmSl
     <>
       <PageHeader title={t.name} description={`Version ${t.version}${hub ? " · Shared by the Hub" : ""}`} />
       {hub ? <Notice className="mb-4">This is a Hub template shared with every firm. It sends in {firm.tradingName}&apos;s branding. Only Hub administrators can change it; create your own to adapt it.</Notice> : null}
-      <TemplateEditor scopeKey={firm.slug} base={`/f/${firm.slug}`} id={hub ? null : t.id} readOnly={readOnly} initial={{ name: t.name, category: t.category, subject: t.subject, preheader: t.preheader ?? "", isActive: t.isActive, blocks: t.blocks }} />
+      <TemplateEditor scopeKey={firm.slug} base={`/f/${firm.slug}`} id={hub ? null : t.id} readOnly={readOnly} initial={{ name: t.name, category: t.category, subject: t.subject, preheader: t.preheader ?? "", isActive: t.isActive, blocks: t.blocks, format: t.format, html: t.html, slots: t.slots, textOverride: t.textOverride }} />
     </>
   );
 }

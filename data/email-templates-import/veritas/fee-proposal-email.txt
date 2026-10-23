@@ -1,0 +1,18 @@
+To: {{CLIENT_EMAIL}}
+Subject: {{EMAIL_SUBJECT}}
+
+Dear {{CLIENT_NAME}},
+
+{{ADVICE}}
+
+The fee is set out in full:
+{{FEE_LINES}}
+Total: {{TOTAL}}. A {{DEPOSIT_LABEL}} ({{DEPOSIT}}) opens your file and we begin at once; the balance is due before submission.
+
+To begin, settle the deposit and once your file is open we send a tailored checklist. Please quote {{REF}}.
+
+Kind regards,
+Owen Magocha
+LLB · Corporate & Wealth Migration Strategist
+Veritas Emigrate
+cs@veritasemigrate.com · +27 12 140 0194

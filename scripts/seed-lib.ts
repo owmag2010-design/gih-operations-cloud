@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_ROLES } from "../src/server/access/permissions";
 import type { EmailBlock } from "../src/server/db/schema";
+import { sanitizeTemplateHtml } from "../src/server/modules/email/html-template";
 
 /** Starter templates: wording only, no client data. Each firm can copy and adapt them. */
 const STARTER_TEMPLATES: { name: string; category: string; subject: string; preheader: string; blocks: EmailBlock[] }[] = [
@@ -213,6 +214,29 @@ export async function runSeed(db: NodePgDatabase<typeof s>, log: (m: string) => 
       await tx.insert(s.emailTemplates).values(STARTER_TEMPLATES.map((t) => ({ ...t, orgId: org.id, firmId: null })));
       log(`  + ${STARTER_TEMPLATES.length} starter email templates (Hub, shared with firms)`);
     }
+    // Imported HTML templates (designs taken from sent emails and the Veritas template folder; no client data).
+    let imported = 0;
+    for (const [dir, firmSlug, manifestName] of [["gih", null, "manifest.json"], ["veritas", "veritas", "manifest-html.json"]] as const) {
+      const base = join(__dirname, "..", "data", "email-templates-import", dir);
+      let manifest: { file: string; name: string; category: string; subject: string; preheader: string | null; slots: { key: string; label: string; default: string; multiline: boolean }[]; source: string }[];
+      try {
+        manifest = JSON.parse(readFileSync(join(base, manifestName), "utf8"));
+      } catch {
+        continue;
+      }
+      const firmId = firmSlug ? firmIds[firmSlug] : null;
+      for (const m of manifest) {
+        const [exists] = await tx
+          .select({ id: s.emailTemplates.id })
+          .from(s.emailTemplates)
+          .where(and(eq(s.emailTemplates.orgId, org.id), eq(s.emailTemplates.name, m.name), firmId ? eq(s.emailTemplates.firmId, firmId) : sql`${s.emailTemplates.firmId} is null`));
+        if (exists) continue;
+        const html = sanitizeTemplateHtml(readFileSync(join(base, m.file), "utf8"));
+        await tx.insert(s.emailTemplates).values({ orgId: org.id, firmId, name: m.name, category: m.category, subject: m.subject, preheader: m.preheader, format: "html", html, slots: m.slots, blocks: [], sourceNote: m.source });
+        imported++;
+      }
+    }
+    if (imported) log(`  + ${imported} imported HTML email templates`);
     const warnings = parsed.filter((p) => p.warnings.length);
     log(`  services: ${parsed.length} per firm (${warnings.length} with notes)`);
     for (const w of warnings) log(`    ! ${w.name}: ${w.warnings.join(" ")}`);

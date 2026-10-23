@@ -32,6 +32,15 @@ const schema = z.object({
   /** Signing secret of the Resend webhook (whsec_…) for received mail and delivery events. */
   RESEND_WEBHOOK_SECRET: z.string().optional().default(""),
   EMAIL_FROM: z.string().default("Global Immigration Hub <hello@thegih.com>"),
+  /** Microsoft 365 mailbox connections (Azure app registration). Empty = not available. */
+  MS_CLIENT_ID: z.string().trim().optional().default(""),
+  MS_CLIENT_SECRET: z.string().trim().optional().default(""),
+  MS_TENANT: z.string().trim().optional().default("common"),
+  /** Gmail / Google Workspace mailbox connections (Google Cloud OAuth client). */
+  GOOGLE_CLIENT_ID: z.string().trim().optional().default(""),
+  GOOGLE_CLIENT_SECRET: z.string().trim().optional().default(""),
+  /** Vercel Cron sends this as a bearer token to /api/cron/*. */
+  CRON_SECRET: z.string().trim().optional().default(""),
 });
 
 export type Env = z.infer<typeof schema>;

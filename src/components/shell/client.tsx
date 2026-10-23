@@ -20,6 +20,12 @@ import {
   Mail,
   LayoutTemplate,
   AtSign,
+  CalendarDays,
+  FolderOpen,
+  Wallet,
+  BookOpen,
+  Megaphone,
+  ChartColumn,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -33,6 +39,7 @@ import type { FutureItem, IconName, NavItem } from "./nav";
 const ICONS: Record<IconName, React.ComponentType<{ className?: string }>> = {
   gauge: Gauge, inbox: Inbox, route: Route, building: Building2, users: Users, scroll: ScrollText,
   contact: Contact, "user-round": UserRound, settings: Settings, layout: LayoutDashboard, "file-text": FileText, mail: Mail, templates: LayoutTemplate, "at-sign": AtSign,
+  calendar: CalendarDays, folder: FolderOpen, wallet: Wallet, book: BookOpen, megaphone: Megaphone, chart: ChartColumn,
 };
 
 export function SidebarNav({ items, future }: { items: NavItem[]; future: FutureItem[] }) {
@@ -43,7 +50,8 @@ export function SidebarNav({ items, future }: { items: NavItem[]; future: Future
       <ul className="flex flex-col gap-0.5">
         {items.map((item) => {
           const Icon = ICONS[item.icon];
-          const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const path = item.href.split("?")[0];
+          const active = item.exact ? pathname === path : pathname === path || pathname.startsWith(`${path}/`) || (item.match ?? []).some((m) => pathname === m || pathname.startsWith(`${m}/`));
           return (
             <li key={item.href}>
               <Link
@@ -51,11 +59,14 @@ export function SidebarNav({ items, future }: { items: NavItem[]; future: Future
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] text-white/75 hover:bg-white/[0.07] hover:text-white",
+                  item.soon && "text-white/70",
                   active && "bg-white/[0.11] font-medium text-white before:absolute before:inset-y-1.5 before:-left-2 before:w-[3px] before:rounded-full before:bg-hub-red",
                 )}
               >
-                <Icon className={cn("size-4 text-white/50", active && "text-white")} />
-                {item.label}
+                <Icon className={cn("size-4 text-white/50", item.soon && "text-white/45", active && "text-white")} />
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.soon ? <span className="rounded-sm border border-white/25 px-1 text-[10px] leading-4 text-white/80" title={`Arrives in ${item.soon}`}>Soon</span> : null}
+                {item.badge ? <span className="min-w-5 rounded-full bg-hub-red px-1.5 text-center text-[11px] leading-5 font-semibold text-white" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
               </Link>
             </li>
           );

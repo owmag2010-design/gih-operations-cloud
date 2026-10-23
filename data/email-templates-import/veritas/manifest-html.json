@@ -1,0 +1,26 @@
+[
+  {
+    "file": "consultation-email.html",
+    "name": "Consultation offer (plain)",
+    "category": "Consultation invitation",
+    "subject": "{{service}}: consultation ({{reference}})",
+    "preheader": null,
+    "slots": [{ "key": "advice", "label": "Our initial advice", "default": "Summarise the enquiry and our first view.", "multiline": true }],
+    "source": "Veritas Templates (Google Drive): TEMPLATE - Consultation Email.txt"
+  },
+  {
+    "file": "fee-proposal-email.html",
+    "name": "Fee proposal (plain)",
+    "category": "Proposal delivery",
+    "subject": "Your {{service}} fee proposal ({{reference}})",
+    "preheader": null,
+    "slots": [
+      { "key": "advice", "label": "Our advice", "default": "Explain the route we recommend.", "multiline": true },
+      { "key": "fee_lines", "label": "Fee lines", "default": "One line per fee item, with amounts.", "multiline": true },
+      { "key": "total", "label": "Total", "default": "e.g. R22,550", "multiline": false },
+      { "key": "deposit_label", "label": "Deposit wording", "default": "e.g. 50% deposit", "multiline": false },
+      { "key": "deposit", "label": "Deposit amount", "default": "e.g. R11,275", "multiline": false }
+    ],
+    "source": "Veritas Templates (Google Drive): TEMPLATE - Fee Proposal Email.txt"
+  }
+]

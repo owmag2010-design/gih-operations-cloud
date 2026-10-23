@@ -1,0 +1,115 @@
+[
+  {
+    "file": "welcome-matter-opening.html",
+    "name": "Welcome and matter opening",
+    "category": "General",
+    "subject": "Welcome to Global Immigration Hub: your {{service}} ({{reference}})",
+    "preheader": "Welcome, {{first_name}}. Your welcome pack is attached.",
+    "slots": [
+      { "key": "intro", "label": "Opening paragraph", "default": "Explain who will handle the matter and anything already received from the client.", "multiline": true },
+      { "key": "attachments", "label": "Attachments", "default": "List each attached document and what the client should do with it.", "multiline": true },
+      { "key": "body", "label": "Further detail", "default": "Add any further context or reassurance for this client.", "multiline": true },
+      { "key": "team_contact", "label": "Team contact details", "default": "Case team email, phone and office address.", "multiline": true }
+    ],
+    "source": "Resend sent email 2026-10-23, design only"
+  },
+  {
+    "file": "proposal-delivery.html",
+    "name": "Fee proposal delivery",
+    "category": "Proposal delivery",
+    "subject": "Your {{service}} proposal ({{reference}})",
+    "preheader": "Your {{service}} proposal is attached. Reference {{reference}}.",
+    "slots": [
+      { "key": "advice", "label": "Our advice", "default": "Summarise the client's situation and the approach we recommend.", "multiline": true },
+      { "key": "total_fee", "label": "Total fee", "default": "Total fee amount.", "multiline": false },
+      { "key": "deposit", "label": "Deposit", "default": "Deposit amount to start.", "multiline": false },
+      { "key": "fee_note", "label": "Fee note", "default": "Note any disbursements or third-party costs and how they are charged.", "multiline": true }
+    ],
+    "source": "Resend sent email 2026-10-22, design only"
+  },
+  {
+    "file": "consultation-invitation.html",
+    "name": "Consultation invitation",
+    "category": "Consultation invitation",
+    "subject": "Let's talk through your application: book a consultation",
+    "preheader": null,
+    "slots": [
+      { "key": "headline", "label": "Headline", "default": "A short headline about the client's enquiry.", "multiline": false },
+      { "key": "intro", "label": "Opening paragraph", "default": "Refer to the client's enquiry and why a consultation is the right next step.", "multiline": true }
+    ],
+    "source": "Resend sent email 2026-10-21, design only"
+  },
+  {
+    "file": "enquiry-follow-up.html",
+    "name": "Enquiry follow-up",
+    "category": "General",
+    "subject": "Your {{service}}: following up",
+    "preheader": null,
+    "slots": [
+      { "key": "headline", "label": "Headline", "default": "A short headline naming the topic of the follow-up.", "multiline": false },
+      { "key": "intro", "label": "Opening paragraph", "default": "Remind the client of their enquiry and ask what has happened since.", "multiline": true },
+      { "key": "body", "label": "How we can help", "default": "Explain the options we can offer from here.", "multiline": true }
+    ],
+    "source": "Resend sent email 2026-10-21, design only"
+  },
+  {
+    "file": "escalation-options.html",
+    "name": "Escalation or application to compel",
+    "category": "Proposal delivery",
+    "subject": "Your pending {{service}}: escalation or application to compel ({{reference}})",
+    "preheader": null,
+    "slots": [
+      { "key": "intro", "label": "Opening paragraph", "default": "Acknowledge the client's situation and explain why escalation can help.", "multiline": true },
+      { "key": "option_a", "label": "Option A description", "default": "Describe the first option and what it includes.", "multiline": true },
+      { "key": "option_a_fee", "label": "Option A fee", "default": "Fee for option A.", "multiline": false },
+      { "key": "option_b", "label": "Option B description", "default": "Describe the second option and what it includes.", "multiline": true },
+      { "key": "option_b_fee", "label": "Option B fee", "default": "Fee for option B.", "multiline": false },
+      { "key": "deposit_note", "label": "Deposit and costs note", "default": "State the deposit for each option and how other costs are charged.", "multiline": true },
+      { "key": "documents_needed", "label": "Documents to send", "default": "the documents we need to begin", "multiline": false },
+      { "key": "team_contact", "label": "Team contact details", "default": "Case team email, phone and office address.", "multiline": true }
+    ],
+    "source": "Resend sent email 2026-10-21, design only"
+  },
+  {
+    "file": "refund-confirmation.html",
+    "name": "Refund confirmation",
+    "category": "Invoice and payment reminder",
+    "subject": "Your refund: confirmed ({{reference}})",
+    "preheader": null,
+    "slots": [
+      { "key": "intro", "label": "Opening paragraph", "default": "Thank the client for their message and acknowledge any delay.", "multiline": true },
+      { "key": "details", "label": "Refund details", "default": "State the refund amount, what it is for and where it will be paid.", "multiline": true },
+      { "key": "timing", "label": "Payment timing", "default": "State when the payment will be received and cleared.", "multiline": true }
+    ],
+    "source": "Resend sent email 2026-10-23, design only"
+  },
+  {
+    "file": "quote-and-update.html",
+    "name": "Quote and matter update",
+    "category": "Application preparation update",
+    "subject": "Your {{service}}: our quote and an update ({{reference}})",
+    "preheader": null,
+    "slots": [
+      { "key": "headline", "label": "Headline", "default": "A short headline for this update.", "multiline": false },
+      { "key": "intro", "label": "Opening paragraph", "default": "Thank the client and say what the attached update covers.", "multiline": true },
+      { "key": "status", "label": "Where things stand", "default": "Summarise progress so far and what remains.", "multiline": true },
+      { "key": "quote", "label": "Our quote", "default": "Set out the quoted work, the fees and any extra costs.", "multiline": true },
+      { "key": "questions", "label": "Questions for the client", "default": "List the questions we need the client to answer.", "multiline": true },
+      { "key": "attachment_name", "label": "Attachment name", "default": "Name of the attached update document.", "multiline": false }
+    ],
+    "source": "Resend sent email 2026-10-23, design only"
+  },
+  {
+    "file": "urgent-call-request.html",
+    "name": "Urgent call request",
+    "category": "Consultation invitation",
+    "subject": "Urgent: your {{service}}, please call our Pretoria Hub ({{reference}})",
+    "preheader": null,
+    "slots": [
+      { "key": "headline", "label": "Headline", "default": "A short headline asking the client to call.", "multiline": false },
+      { "key": "intro", "label": "Opening paragraph", "default": "Thank the client for their update and acknowledge the difficulty.", "multiline": true },
+      { "key": "body", "label": "Why it is urgent", "default": "Explain why the matter is now urgent.", "multiline": true }
+    ],
+    "source": "Resend sent email 2026-10-23, design only"
+  }
+]

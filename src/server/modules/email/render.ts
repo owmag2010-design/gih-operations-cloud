@@ -40,7 +40,13 @@ export const MERGE_FIELDS = {
   full_name: "Client full name",
   email: "Client email",
   reference: "Lead or client reference",
-  firm_name: "Firm name",
+  firm_name: "Practice name",
+  practice_name: "Practice name",
+  matter_reference: "Matter reference",
+  service: "Service",
+  case_manager: "Case manager",
+  booking_link: "Booking link",
+  payment_link: "Payment link",
   sender_name: "Your name",
   sender_email: "Your sending address",
   today: "Today's date",
@@ -141,7 +147,7 @@ export function mergeBlocks(blocks: EmailBlock[], values: MergeValues): EmailBlo
   });
 }
 
-export type RenderInput = { brand: EmailBrand; subject: string; preheader?: string | null; blocks: EmailBlock[]; signature?: string | null; values?: MergeValues; reference?: string | null };
+export type RenderInput = { brand: EmailBrand; subject: string; preheader?: string | null; blocks: EmailBlock[]; signature?: string | null; signatureHtml?: string | null; values?: MergeValues; reference?: string | null };
 
 export function renderEmail(input: RenderInput): { subject: string; html: string; text: string } {
   const values = input.values ?? {};
@@ -164,7 +170,7 @@ export function renderEmail(input: RenderInput): { subject: string; html: string
 <tr><td style="padding:32px 32px 12px">
 ${input.reference ? `<p style="margin:0 0 18px;font-family:${FONT};font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${b.accent}">${esc(input.reference)}</p>` : ""}
 ${blocks.map((x) => blockHtml(x, b)).join("\n")}
-${signature ? `<p style="margin:22px 0 6px;font-family:${FONT};font-size:14px;line-height:1.55;color:${b.ink}">${inline(signature)}</p>` : ""}
+${input.signatureHtml ? input.signatureHtml : signature ? `<p style="margin:22px 0 6px;font-family:${FONT};font-size:14px;line-height:1.55;color:${b.ink}">${inline(signature)}</p>` : ""}
 </td></tr>
 <tr><td style="padding:18px 32px 26px;border-top:1px solid #e6e7e5;font-family:${FONT};font-size:11px;line-height:1.6;color:#60666b">${esc(b.footer)}</td></tr>
 </table></td></tr></table></body></html>`;
@@ -176,4 +182,35 @@ ${signature ? `<p style="margin:22px 0 6px;font-family:${FONT};font-size:14px;li
 /** Plain message typed in the dashboard (no template): paragraphs only. */
 export function plainBlocks(body: string): EmailBlock[] {
   return [{ type: "paragraph", text: body.trim() }];
+}
+
+/* ───────────────────────── Signatures ───────────────────────── */
+
+export type SignatureData = {
+  fullName: string | null;
+  role: string | null;
+  practice: string;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  bookingUrl: string | null;
+  disclaimer: string | null;
+  showLogo: boolean;
+};
+
+/** One signature block, in the practice's colours. Used once per message. */
+export function renderSignature(sig: SignatureData, brand: EmailBrand): { html: string; text: string } {
+  const contact = [sig.phone, sig.email, sig.website?.replace(/^https?:\/\//, "")].filter(Boolean) as string[];
+  const booking = sig.bookingUrl ? safeUrl(sig.bookingUrl) : null;
+  const website = sig.website ? safeUrl(/^https?:/.test(sig.website) ? sig.website : `https://${sig.website}`) : null;
+  const logo = sig.showLogo && brand.logoUrl && brand.key === "hub" ? brand.logoUrl.replace("-white.png", "-navy.png") : null;
+  const html = `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 6px;border-top:1px solid #e6e7e5;padding-top:14px" data-gih-signature="1"><tr><td style="padding-top:14px;font-family:${FONT};font-size:13px;line-height:1.55;color:${brand.ink}">
+${logo ? `<img src="${esc(logo)}" width="150" alt="${esc(sig.practice)}" style="display:block;border:0;height:auto;max-width:150px;margin:0 0 10px">` : ""}
+${sig.fullName ? `<strong style="font-size:14px">${esc(sig.fullName)}</strong><br>` : ""}${sig.role ? `${esc(sig.role)}<br>` : ""}<span style="color:${brand.accent}">${esc(sig.practice)}</span>
+${contact.length ? `<br><span style="color:#60666b">${contact.map((c) => (c === sig.email ? `<a href="mailto:${esc(c)}" style="color:#60666b">${esc(c)}</a>` : c === sig.website?.replace(/^https?:\/\//, "") && website ? `<a href="${esc(website)}" style="color:#60666b">${esc(c)}</a>` : esc(c))).join(" &middot; ")}</span>` : ""}
+${booking ? `<br><a href="${esc(booking)}" style="color:${brand.accent};font-weight:bold">Book a consultation &rarr;</a>` : ""}
+${sig.disclaimer ? `<p style="margin:12px 0 0;font-size:11px;line-height:1.5;color:#8a8f93">${inline(sig.disclaimer)}</p>` : ""}
+</td></tr></table>`;
+  const text = [sig.fullName, sig.role, sig.practice, contact.join(" · "), booking ? `Book a consultation: ${booking}` : null, sig.disclaimer].filter(Boolean).join("\n");
+  return { html, text };
 }

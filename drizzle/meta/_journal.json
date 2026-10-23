@@ -85,6 +85,27 @@
       "when": 1792747646833,
       "tag": "0011_email_firm_consistency",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792759227030,
+      "tag": "0012_email_workspace",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792759265749,
+      "tag": "0013_email_workspace_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792759431783,
+      "tag": "0014_mailbox_inbound_optional",
+      "breakpoints": true
     }
   ]
 }

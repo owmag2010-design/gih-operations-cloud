@@ -7,7 +7,6 @@ import { countryName } from "@/lib/countries";
 import { fullName, PRIORITY_LABELS, PRIORITY_TONE, SOURCE_LABELS, STAGE_TONE } from "@/lib/labels";
 import { NotFoundError } from "@/server/errors";
 import { getLead, listStages } from "@/server/modules/crm/leads";
-import { listTemplates } from "@/server/modules/email/mail";
 import { ComposeDialog } from "@/components/email/client";
 import { listProposals, statusLabel } from "@/server/modules/proposals/proposals";
 import { listCatalogue } from "@/server/modules/services/services";
@@ -39,7 +38,6 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/f/[
   const canSeeProposals = ctx.has("proposals:view", firm.firmId);
   const proposals = canSeeProposals ? (await listProposals(ctx, firm.firmId, { leadId: lead.id })).rows : [];
   const catalogue = canPropose ? (await listCatalogue(ctx, firm.firmId, { activeOnly: true })).map((x) => ({ id: x.id, name: x.name, category: x.category, total: formatMoney(x.totalMinor, x.currency) })) : [];
-  const templates = canEmail ? (await listTemplates(ctx, { kind: "firm", firmId: firm.firmId }, { includeHub: true, activeOnly: true })).map((t) => ({ id: t.id, name: t.name, category: t.category, subject: t.subject, hub: t.firmId === null })) : [];
 
   return (
     <>
@@ -57,7 +55,7 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/f/[
         }
         actions={
           <>
-            {canEmail ? <ComposeDialog firmSlug={firm.slug} target={{ leadId: lead.id }} to={lead.email} templates={templates} /> : null}
+            {canEmail ? <ComposeDialog firmId={firm.firmId} target={{ leadId: lead.id }} to={lead.email} /> : null}
             {canPropose ? <CreateProposalDialog firmSlug={firm.slug} leadId={lead.id} services={catalogue} /> : null}
             {canEdit && !client ? <StageSelect firmSlug={firm.slug} leadId={lead.id} current={lead.stageId} stages={stages.filter((s) => s.category !== "won").map((s) => ({ id: s.id, name: s.name }))} /> : null}
             {canEdit ? <Button asChild><Link href={`${base}/leads/${lead.id}/edit`}>Edit</Link></Button> : null}

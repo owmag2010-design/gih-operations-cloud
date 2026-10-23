@@ -1,0 +1,26 @@
+[
+  {
+    "file": "veritas/fee-proposal-email.txt",
+    "format": "text/plain",
+    "note": "Plain-text email template, not HTML. No HTML email templates were found in Drive.",
+    "brand": "veritas",
+    "drive_name": "TEMPLATE - Fee Proposal Email.txt",
+    "drive_id": "1KyHACrgsiCtADKAWL-UB6CsFI3j44-_q",
+    "drive_path": "Veritas Templates/TEMPLATE - Fee Proposal Email.txt",
+    "suggested_category": "Proposal delivery",
+    "placeholders_found": ["{{CLIENT_EMAIL}}", "{{EMAIL_SUBJECT}}", "{{CLIENT_NAME}}", "{{ADVICE}}", "{{FEE_LINES}}", "{{TOTAL}}", "{{DEPOSIT_LABEL}}", "{{DEPOSIT}}", "{{REF}}"],
+    "remote_images": []
+  },
+  {
+    "file": "veritas/consultation-email.txt",
+    "format": "text/plain",
+    "note": "Plain-text email template, not HTML. Hard-codes consultation fees (30 min R850, 60 min R1,700).",
+    "brand": "veritas",
+    "drive_name": "TEMPLATE - Consultation Email.txt",
+    "drive_id": "11EtMnZeFmi2ph1sYN2rTlx8ZMBG-o76a",
+    "drive_path": "Veritas Templates/TEMPLATE - Consultation Email.txt",
+    "suggested_category": "Consultation invitation",
+    "placeholders_found": ["{{CLIENT_EMAIL}}", "{{MATTER}}", "{{REF}}", "{{CLIENT_NAME}}", "{{ADVICE}}"],
+    "remote_images": []
+  }
+]
