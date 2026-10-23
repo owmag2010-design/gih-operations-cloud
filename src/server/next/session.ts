@@ -66,12 +66,10 @@ export async function requireFirm(slug: string): Promise<StaffGuard & { firm: Fi
 }
 
 /** Where to land after sign-in. */
-export function homeFor(ctx: AccessContext, activeFirmId: string | null): string {
-  if (activeFirmId) {
-    const f = ctx.firms.get(activeFirmId);
-    if (f) return `/f/${f.slug}`;
-  }
-  if (ctx.has("metrics:group") || ctx.has("intake:view")) return "/hq";
-  const first = [...ctx.firms.values()].find((f) => f.permissions.has("firm:view"));
-  return first ? `/f/${first.slug}` : "/account";
+export function homeFor(ctx: AccessContext): string {
+  // Everyone with work to do lands on their own day; the frame around it
+  // follows the practice they last worked in.
+  const anyFirm = [...ctx.firms.values()].some((f) => f.permissions.has("firm:view"));
+  if (anyFirm || ctx.has("metrics:group") || ctx.has("intake:view")) return "/today";
+  return "/account";
 }

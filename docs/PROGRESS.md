@@ -1,5 +1,8 @@
 # Progress Log
 
+## 24 Oct 2026: New interface ("Editorial Daylight")
+**Done:** Owen chose direction B from the three concepts. New top-bar shell with pill navigation and a mobile drawer; warm light palette; practice accent colours (Hub navy/red, Veritas magenta, Mimshac gold, Nextmove teal); per-person light / dark / match-device choice in the account menu (`users.ui_theme`, migration 0015); "My day" at `/today` as the landing page for everyone (greeting, what needs you, practice tiles, coming up), built only from records the person can access (`src/server/modules/today`). 81 unit/integration tests and 10 end-to-end tests (including axe in light and dark) pass.
+
 ## 24 Oct 2026: Milestone 1 of the expanded brief: email workspace and navigation
 **Done (tested):**
 - Navigation rebuilt around the eleven workspaces (Overview, Inbox, Enquiries & Deals, Clients & Matters, Tasks & Calendar, Documents & Templates, Proposals & Finance, Knowledge & Updates, Content, Reports, Settings). Unbuilt ones are marked "Soon" and open an honest page saying what's coming and when.

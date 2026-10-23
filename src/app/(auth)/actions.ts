@@ -156,5 +156,5 @@ export async function landingPath() {
   if (!session) return "/login";
   const ctx = await loadAccessContext(session.userId);
   if (!ctx) return "/login";
-  return homeFor(ctx, session.activeFirmId);
+  return homeFor(ctx);
 }

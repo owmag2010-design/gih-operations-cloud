@@ -34,7 +34,7 @@ test("wrong password is refused without saying whether the account exists", asyn
 
 test("a consultant creates a lead, adds a note and converts it to a client", async ({ page }) => {
   await signIn(page, "veritas.e2e@example.test");
-  await expect(page).toHaveURL(/\/f\/veritas$/);
+  await expect(page).toHaveURL(/\/today$/);
   await page.goto("/f/veritas/leads/new");
   await page.getByLabel("First name").fill("E2E");
   await page.getByLabel("Last name").fill("Person");
@@ -109,4 +109,32 @@ test("sign-in and leads pages have no serious accessibility violations", async (
     const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
     expect(r.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => `${path}: ${v.id}`)).toEqual([]);
   }
+});
+
+test("my day greets the person, follows their theme, and has no serious accessibility violations", async ({ page }) => {
+  await signIn(page, "veritas.e2e@example.test");
+  await page.goto("/today");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(/(Good (morning|afternoon|evening)|Welcome back), /);
+  await expect(page.getByRole("heading", { name: "Your practices" })).toBeVisible();
+  const axe = async () => (await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze()).violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`);
+  expect(await axe()).toEqual([]);
+  if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: `${process.env.E2E_SCREENSHOTS}/today-light.png`, fullPage: true });
+
+  // Switch to dark from the account menu; the choice is saved to the profile.
+  await page.getByRole("button", { name: /Account menu/ }).click();
+  await page.getByRole("menuitemradio", { name: "Dark" }).click();
+  await expect(page.locator("[data-deck]")).toHaveAttribute("data-theme", "dark");
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await expect(page.locator("[data-deck]")).toHaveAttribute("data-theme", "dark");
+  expect(await axe()).toEqual([]);
+  if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: `${process.env.E2E_SCREENSHOTS}/today-dark.png`, fullPage: true });
+  for (const path of ["/f/veritas", "/f/veritas/leads"]) {
+    await page.goto(path);
+    expect((await axe()).map((v) => `${path} ${v}`)).toEqual([]);
+  }
+
+  await page.getByRole("button", { name: /Account menu/ }).click();
+  await page.getByRole("menuitemradio", { name: "Light" }).click();
+  await expect(page.locator("[data-deck]")).toHaveAttribute("data-theme", "light");
 });

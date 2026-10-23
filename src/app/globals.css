@@ -1,22 +1,19 @@
 @import "tailwindcss";
 
-/* GIH Operations Cloud tokens: Global Immigration Hub brand (website v4). See docs/06-design-system.md. */
+/* GIH Operations Cloud tokens: "Editorial Daylight" (light, default) and the dark theme. See docs/06-design-system.md. */
 :root {
-  --paper: #faf9f6;
+  --paper: #f4f1ec;
   --surface: #ffffff;
-  --sunken: #f3f2ee;
-  --hairline: #e6e7e5;
-  --hairline-strong: #d9dbd8;
-  --ink: #202326;
-  --ink-2: #3a3f44;
-  --muted: #60666b;
+  --sunken: #f1ede6;
+  --hairline: #e2ddd3;
+  --hairline-strong: #d3ccbf;
+  --ink: #1d2230;
+  --ink-2: #4a5162;
+  --muted: #5f6575;
   --navy: #1b263b;
   --navy-2: #24324c;
   --navy-3: #30405f;
   --sky: #eaf1f6;
-  --accent: #1b263b;
-  --accent-hover: #24324c;
-  --accent-soft: #eaf1f6;
   --danger: #a3352b;
   --danger-soft: #f8ebe9;
   --warn: #8a5a0b;
@@ -27,6 +24,86 @@
   --hub-red-deep: #b8121f;
   --hub-red-tint: #fbebec;
   --firm: #3d3a36; /* overridden per firm workspace */
+  --rail: #1b263b;
+  --rail-ink: #9aa6bd;
+  --glow: transparent;
+}
+
+/* Accent colour (practice brand). The shell sets --a-light* and --a-dark*. */
+:root,
+[data-theme] {
+  --accent: var(--a-light, #1b263b);
+  --accent-hover: var(--a-light-hover, #24324c);
+  --accent-soft: var(--a-light-soft, #eaf1f6);
+  --accent-ink: var(--a-light-ink, #ffffff); /* text on the accent colour */
+}
+
+/*
+ * Dark theme (optional, chosen per person). Every component reads the
+ * same tokens, so the whole app follows. Practice workspaces set --accent,
+ * --accent-hover, --accent-soft and --accent-ink on the shell (app-shell.tsx).
+ */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0b1220;
+  --surface: #111a2c;
+  --sunken: #16213a;
+  --hairline: #1e2a44;
+  --hairline-strong: #2b3a5c;
+  --ink: #e9edf4;
+  --ink-2: #c3cbdb;
+  --muted: #8e9ab2;
+  --navy: #24324c;
+  --navy-2: #2c3c5c;
+  --navy-3: #3a4b6e;
+  --sky: #1a2742;
+  --danger: #ff8f96;
+  --danger-soft: #3a1820;
+  --warn: #f2c86e;
+  --warn-soft: #2d2615;
+  --ok: #72d6a3;
+  --ok-soft: #10301f;
+  --hub-red-tint: #3a1820;
+  --rail: #070c17;
+  --rail-ink: #8e9ab2;
+
+  --accent: var(--a-dark, #dd1929);
+  --accent-hover: var(--a-dark-hover, #ef3442);
+  --accent-soft: var(--a-dark-soft, rgba(221, 25, 41, 0.16));
+  --accent-ink: var(--a-dark-ink, #ffffff);
+  --glow: var(--a-dark-glow, rgba(221, 25, 41, 0.10));
+}
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    color-scheme: dark;
+    --paper: #0b1220;
+    --surface: #111a2c;
+    --sunken: #16213a;
+    --hairline: #1e2a44;
+    --hairline-strong: #2b3a5c;
+    --ink: #e9edf4;
+    --ink-2: #c3cbdb;
+    --muted: #8e9ab2;
+    --navy: #24324c;
+    --navy-2: #2c3c5c;
+    --navy-3: #3a4b6e;
+    --sky: #1a2742;
+    --danger: #ff8f96;
+    --danger-soft: #3a1820;
+    --warn: #f2c86e;
+    --warn-soft: #2d2615;
+    --ok: #72d6a3;
+    --ok-soft: #10301f;
+    --hub-red-tint: #3a1820;
+    --rail: #070c17;
+    --rail-ink: #8e9ab2;
+  
+    --accent: var(--a-dark, #dd1929);
+    --accent-hover: var(--a-dark-hover, #ef3442);
+    --accent-soft: var(--a-dark-soft, rgba(221, 25, 41, 0.16));
+    --accent-ink: var(--a-dark-ink, #ffffff);
+    --glow: var(--a-dark-glow, rgba(221, 25, 41, 0.10));
+  }
 }
 
 @theme inline {
@@ -55,11 +132,14 @@
   --color-hub-red: var(--hub-red);
   --color-hub-red-deep: var(--hub-red-deep);
   --color-hub-red-tint: var(--hub-red-tint);
+  --color-accent-ink: var(--accent-ink);
+  --color-rail: var(--rail);
+  --color-rail-ink: var(--rail-ink);
   --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-display), Georgia, "Times New Roman", serif;
   --radius-sm: 4px;
   --radius-md: 6px;
-  --radius-lg: 10px;
+  --radius-lg: 12px;
 }
 
 html { background: var(--paper); color: var(--ink); }
@@ -67,7 +147,35 @@ body { font-family: var(--font-sans); font-size: 14px; line-height: 1.5; backgro
 
 .font-display { font-family: var(--font-display), Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
 
+/* Dark theme details: inputs and native controls follow the tokens. */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea { background-color: var(--sunken); color: var(--ink); border-color: var(--hairline-strong); }
+[data-theme="dark"] ::placeholder { color: #6f7b93; }
+[data-theme="dark"] .gih-toast { background: var(--surface) !important; color: var(--ink) !important; border-color: var(--hairline-strong) !important; }
+@media (prefers-color-scheme: dark) {
+[data-theme="system"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="system"] select,
+[data-theme="system"] textarea { background-color: var(--sunken); color: var(--ink); border-color: var(--hairline-strong); }
+[data-theme="system"] ::placeholder { color: #6f7b93; }
+[data-theme="system"] .gih-toast { background: var(--surface) !important; color: var(--ink) !important; border-color: var(--hairline-strong) !important; }
+}
+
+/* A soft practice-coloured light at the top of the workspace. */
+.deck-glow { background-image: radial-gradient(1200px 380px at 30% -120px, var(--glow), transparent 70%); }
+
 .num { font-variant-numeric: tabular-nums; }
+
+/* Show something only in the light or the dark theme (e.g. the logo). */
+[data-theme="dark"] .light-only { display: none; }
+[data-theme="light"] .dark-only { display: none; }
+@media (prefers-color-scheme: dark) { [data-theme="system"] .light-only { display: none; } }
+@media (prefers-color-scheme: light) { [data-theme="system"] .dark-only { display: none; } }
+
+/* Text in a practice's colour: set --c-l (light) and --c-d (dark) inline. */
+.practice-ink { color: var(--c-l); }
+[data-theme="dark"] .practice-ink { color: var(--c-d); }
+@media (prefers-color-scheme: dark) { [data-theme="system"] .practice-ink { color: var(--c-d); } }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 

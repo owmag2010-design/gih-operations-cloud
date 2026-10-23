@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "ui_theme" text DEFAULT 'light' NOT NULL;

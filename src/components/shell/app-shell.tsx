@@ -1,77 +1,93 @@
-import type { AccessContext } from "@/server/access/context";
-import { CommandPalette } from "./command-palette";
 import Link from "next/link";
-import { HubLogo } from "../hub-mark";
-import { MobileNavToggle, SidebarNav, WorkspaceSwitcher, UserMenu } from "./client";
+import type { AccessContext } from "@/server/access/context";
+import { currentSession } from "@/server/next/session";
+import { HubLogo, HubMark } from "../hub-mark";
+import { CommandPalette } from "./command-palette";
+import { DeckRoot, DrawerNav, MobileNavToggle, NewMenu, TopNav, UserMenu, WorkspaceSwitcher } from "./client";
 import type { FutureItem, NavItem, Workspace } from "./nav";
+import { accentVars, practicePalette } from "./theme";
 
-export type WorkspaceOption = { key: string; label: string; href: string; color: string | null; kind: "hq" | "firm" };
+export type WorkspaceOption = { key: string; label: string; short: string; href: string; dot: string; kind: "hq" | "firm" };
 
 function workspaceOptions(ctx: AccessContext): WorkspaceOption[] {
   const opts: WorkspaceOption[] = [];
   if (ctx.has("metrics:group") || ctx.has("intake:view") || ctx.has("firms:view") || ctx.has("staff:view")) {
-    opts.push({ key: "hq", label: "Hub headquarters", href: "/hq", color: null, kind: "hq" });
+    opts.push({ key: "hq", label: "Hub headquarters", short: "Hub", href: "/hq", dot: practicePalette(null).dark.base, kind: "hq" });
   }
   for (const f of [...ctx.firms.values()].sort((a, b) => a.tradingName.localeCompare(b.tradingName))) {
-    if (f.permissions.has("firm:view")) opts.push({ key: f.firmId, label: f.tradingName, href: `/f/${f.slug}`, color: f.brandColor, kind: "firm" });
+    if (!f.permissions.has("firm:view")) continue;
+    opts.push({ key: f.firmId, label: f.tradingName, short: f.tradingName.split(/\s+/)[0], href: `/f/${f.slug}`, dot: practicePalette(f.slug, f.brandColor).dark.base, kind: "firm" });
   }
   return opts;
 }
 
+function initialsOf(name: string) {
+  return name.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+}
+
 /**
- * Staff application frame. The active firm's brand colour runs down the
- * sidebar edge so people always know whose records they are looking at.
+ * Staff application frame ("Editorial Daylight"): a top bar with the logo,
+ * pill navigation, search, the workspace switcher, quick actions and the
+ * account menu, then the page. On small screens the navigation is a drawer. The practice
+ * whose records are open sets the accent colour, so people always know whose
+ * work they are looking at. The person's light/dark choice comes from their
+ * profile.
  */
-export function AppShell({
+export async function AppShell({
   ctx,
   workspace,
   nav,
-  future,
   quickActions,
   children,
 }: {
   ctx: AccessContext;
   workspace: Workspace;
   nav: NavItem[];
-  future: FutureItem[];
+  future?: FutureItem[];
   quickActions?: { label: string; href: string }[];
   children: React.ReactNode;
 }) {
-  const color = workspace.kind === "firm" ? workspace.color : "var(--hub-red)";
+  const session = await currentSession();
+  const theme = session?.user.uiTheme ?? "light";
   const options = workspaceOptions(ctx);
   const current = workspace.kind === "firm" ? options.find((o) => o.kind === "firm" && o.href === `/f/${workspace.slug}`) : options.find((o) => o.kind === "hq");
+  const palette = workspace.kind === "firm" ? practicePalette(workspace.slug, workspace.color) : practicePalette(null);
   const commandNav = [...nav.map((n) => ({ label: n.label, href: n.href })), ...options.map((o) => ({ label: `Open ${o.label}`, href: o.href })), { label: "Your account", href: "/account" }];
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[248px_1fr]" style={{ ["--firm" as string]: color }}>
+    <DeckRoot theme={theme} vars={accentVars(palette)}>
       <input type="checkbox" id="nav-toggle" className="peer sr-only" aria-hidden="true" tabIndex={-1} />
       <aside
-        className="fixed inset-y-0 left-0 z-30 flex w-[248px] -translate-x-full flex-col bg-navy text-white transition-transform peer-checked:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0"
-        aria-label="Main"
+        className="fixed inset-y-0 left-0 z-40 flex w-[280px] -translate-x-full flex-col border-r border-hairline bg-paper transition-transform peer-checked:translate-x-0 lg:hidden"
+        aria-label="Navigation"
       >
-        <div className="absolute inset-y-0 left-0 w-[3px] bg-firm" aria-hidden="true" />
-        <Link href="/" className="block px-5 pt-5 pb-4" aria-label="Global Immigration Hub home">
-          <HubLogo tone="white" className="h-[18px] w-auto" />
-          <span className="mt-1.5 block text-[10px] font-medium tracking-[0.18em] text-white/55 uppercase">Operations Cloud</span>
+        <Link href="/today" className="flex items-center px-5 pt-5 pb-4" aria-label="Global Immigration Hub: my day">
+          <HubLogo className="light-only h-[17px] w-auto" />
+          <HubLogo tone="white" className="dark-only h-[17px] w-auto" />
         </Link>
-        <div className="border-y border-white/10 px-3 py-2.5">
-          <WorkspaceSwitcher options={options} currentKey={current?.key ?? null} />
-        </div>
-        <SidebarNav items={nav} future={future} />
-        <div className="border-t border-white/10 px-3 py-3">
-          <UserMenu name={ctx.user.name} email={ctx.user.email} />
-        </div>
+        <DrawerNav items={nav} />
       </aside>
-      <label htmlFor="nav-toggle" className="fixed inset-0 z-20 hidden bg-ink/20 peer-checked:block lg:hidden" aria-hidden="true" />
-      <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-hairline bg-paper/90 px-4 backdrop-blur lg:px-8">
+      <label htmlFor="nav-toggle" className="fixed inset-0 z-30 hidden bg-ink/30 peer-checked:block lg:hidden" aria-hidden="true" />
+      <header className="sticky top-0 z-20 border-b border-hairline bg-paper/90 backdrop-blur-md">
+        <div className="mx-auto flex h-[72px] max-w-[1440px] items-center gap-3 px-4 lg:gap-6 lg:px-10">
           <MobileNavToggle />
-          <div className="ml-auto flex items-center gap-2">
+          <Link href="/today" className="shrink-0" aria-label="Global Immigration Hub: my day">
+            <span className="max-sm:hidden">
+              <HubLogo className="light-only h-[17px] w-auto" />
+              <HubLogo tone="white" className="dark-only h-[17px] w-auto" />
+            </span>
+            <HubMark className="size-8 sm:hidden" />
+          </Link>
+          <TopNav items={nav} />
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <CommandPalette navigation={commandNav} quickActions={quickActions ?? []} />
+            <WorkspaceSwitcher options={options} currentKey={current?.key ?? null} />
+            <NewMenu actions={quickActions ?? []} />
+            <UserMenu name={ctx.user.name} email={ctx.user.email} initials={initialsOf(ctx.user.name)} />
           </div>
-        </header>
-        <main className="mx-auto w-full max-w-[1320px] flex-1 px-4 py-6 lg:px-8 lg:py-8 has-[[data-full-bleed]]:max-w-none has-[[data-full-bleed]]:p-0">{children}</main>
-      </div>
-    </div>
+        </div>
+      </header>
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 lg:px-10 lg:py-8 has-[[data-full-bleed]]:max-w-none has-[[data-full-bleed]]:p-0">{children}</main>
+    </DeckRoot>
   );
 }

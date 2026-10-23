@@ -7,7 +7,7 @@ import { requireStaff } from "@/server/next/session";
 export default async function HqLayout({ children }: LayoutProps<"/hq">) {
   const { ctx } = await requireStaff();
   const nav = hqNav(ctx, { unread: await unreadCount(ctx).catch(() => 0) });
-  if (!nav.length) notFound();
+  if (nav.length <= 1) notFound();
   const quick = ctx.has("intake:create") ? [{ label: "Capture an enquiry", href: "/hq/intake/new" }] : [];
   return (
     <AppShell ctx={ctx} workspace={{ kind: "hq" }} nav={nav} future={HQ_FUTURE} quickActions={quick}>

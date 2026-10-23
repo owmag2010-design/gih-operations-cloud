@@ -8,12 +8,14 @@ export const SESSION_IDLE_MS = 12 * 60 * 60 * 1000; // 12 hours without activity
 export const SESSION_ABSOLUTE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days at most
 const TOUCH_EVERY_MS = 5 * 60 * 1000;
 
+export type UiTheme = "dark" | "light" | "system";
+
 export type ValidSession = {
   id: string;
   userId: string;
   mfaVerified: boolean;
   activeFirmId: string | null;
-  user: { id: string; orgId: string; email: string; name: string; mfaEnabled: boolean };
+  user: { id: string; orgId: string; email: string; name: string; mfaEnabled: boolean; uiTheme: UiTheme };
 };
 
 export async function createSession(
@@ -54,6 +56,7 @@ export async function validateSessionToken(token: string): Promise<ValidSession 
       name: users.name,
       status: users.status,
       mfaEnabledAt: users.mfaEnabledAt,
+      uiTheme: users.uiTheme,
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
@@ -78,7 +81,7 @@ export async function validateSessionToken(token: string): Promise<ValidSession 
     userId: row.userId,
     mfaVerified: row.mfaVerified,
     activeFirmId: row.activeFirmId,
-    user: { id: row.userId, orgId: row.orgId, email: row.email, name: row.name, mfaEnabled: !!row.mfaEnabledAt },
+    user: { id: row.userId, orgId: row.orgId, email: row.email, name: row.name, mfaEnabled: !!row.mfaEnabledAt, uiTheme: (row.uiTheme === "dark" || row.uiTheme === "system" ? row.uiTheme : "light") as UiTheme },
   };
 }
 
@@ -99,4 +102,9 @@ export async function deleteUserSessions(userId: string, exceptSessionId?: strin
   await db()
     .delete(sessions)
     .where(exceptSessionId ? and(eq(sessions.userId, userId), ne(sessions.id, exceptSessionId)) : eq(sessions.userId, userId));
+}
+
+/** The person's own interface theme. */
+export async function setUiTheme(userId: string, theme: UiTheme) {
+  await db().update(users).set({ uiTheme: theme, updatedAt: new Date() }).where(eq(users.id, userId));
 }

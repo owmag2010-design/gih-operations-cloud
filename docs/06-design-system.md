@@ -1,21 +1,28 @@
 # UI Design System
 
 ## Intent
-A calm working tool for people who live in it all day: dense records, quiet chrome, fast keyboard paths. One memorable element: the active firm's brand colour runs down the sidebar edge, so staff always know whose records they are in. The Hub uses its red; Veritas, Mimshac and Nextmove use their own colours (editable in firm settings).
+"Editorial Daylight" (chosen by Owen, 24 Oct 2026): a warm, light, magazine-like workspace for people who live in it all day. Serif headings (Newsreader) over Instrument Sans, pill navigation along the top, generous rounded cards. The practice whose records are open sets the accent colour (active pill, primary buttons, focus), so staff always know whose work they are in. Each person can switch to a dark theme or follow their device from the account menu (stored in `users.ui_theme`, default light).
+
+## Shell (`src/components/shell`)
+- Top bar: logo, pill navigation (5 items on large screens, 7 on very wide ones, the rest under "More"), search (Ctrl K), workspace switcher, "New" quick actions, account menu (appearance, account, sign out). Below `lg` the navigation is a drawer.
+- `/today` ("My day") is where everyone lands: greeting in their own time zone, a summary of what needs them, a "Needs you" feed, practice tiles in each practice's brand, and "Coming up" (follow-ups now; calendar items from Milestone 2). Real records only.
+- `theme.ts` holds each practice's palette: a light accent, a dark accent and a tile style. Practices without a tuned palette use their stored brand colour.
 
 ## Tokens (`src/app/globals.css`)
-| Token | Value | Use |
+| Token | Light | Use |
 |---|---|---|
-| `paper` | `#fbfaf8` | Page background |
-| `surface` | `#ffffff` | Panels, inputs |
-| `sunken` | `#f2f0ec` | Table headers, hover, quiet fills |
-| `hairline` / `hairline-strong` | `#e3dfd8` / `#cfc9bf` | Borders |
-| `ink` / `ink-2` / `muted` | `#24221f` / `#47433d` / `#6e685f` | Text, by importance |
-| `accent` | `#2b4c7e` | The only interactive colour: buttons, links, focus |
+| `paper` | `#f4f1ec` | Page background |
+| `surface` | `#ffffff` | Cards, inputs |
+| `sunken` | `#f1ede6` | Quiet fills, hover |
+| `hairline` / `hairline-strong` | `#e2ddd3` / `#d3ccbf` | Borders |
+| `ink` / `ink-2` / `muted` | `#1d2230` / `#4a5162` / `#5f6575` | Text, by importance |
+| `accent` / `accent-ink` | practice colour / text on it | Active navigation, primary buttons, focus |
+| `hub-red` | `#dd1929` | Badges, "New", Hub marks |
 | `ok` / `warn` / `danger` | green / amber / red pairs with soft backgrounds | Status only |
-| `firm` | per workspace | Sidebar band, pipeline bars |
 
-Radii: 4 / 6 / 10 px by element size. Shadows only on floating layers (menus, dialogs).
+The dark theme redefines the same tokens under `[data-theme="dark"]` (and `[data-theme="system"]` when the device prefers dark). Practice-coloured text uses `.practice-ink` with `--c-l` / `--c-d` so it stays readable in both. Use `.light-only` / `.dark-only` for assets that differ (the logo).
+
+Radii: 6 / 12 px for controls, 16–28 px for cards and the hero. Shadows only on floating layers (menus, dialogs).
 
 ## Type
 Instrument Sans throughout. 14 px base, 13 px for dense tables and secondary text, 22 px page titles, 26–28 px for headline counts. Tabular figures (`.num`) for references, counts, dates and money. Sentence case everywhere; no uppercase labels.

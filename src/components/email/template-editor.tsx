@@ -105,8 +105,8 @@ export function TemplateEditor({ scopeKey, base, id, initial, readOnly }: { scop
           <Field label="Preview text" name="preheader" hint="The grey line many inboxes show after the subject."><Input value={d.preheader} onChange={(e) => set({ preheader: e.target.value })} maxLength={200} /></Field>
 
           <div className="inline-flex self-start rounded-md border border-hairline-strong p-0.5 text-xs" role="radiogroup" aria-label="How the template is built">
-            <button type="button" role="radio" aria-checked={!isHtml} onClick={() => set({ format: "blocks" })} className={cn("inline-flex items-center gap-1.5 rounded px-2.5 py-1", !isHtml ? "bg-navy text-white" : "text-ink-2 hover:text-ink")}><LayoutList className="size-3.5" /> Built from blocks</button>
-            <button type="button" role="radio" aria-checked={isHtml} onClick={() => set({ format: "html" })} className={cn("inline-flex items-center gap-1.5 rounded px-2.5 py-1", isHtml ? "bg-navy text-white" : "text-ink-2 hover:text-ink")}><Code2 className="size-3.5" /> HTML design</button>
+            <button type="button" role="radio" aria-checked={!isHtml} onClick={() => set({ format: "blocks" })} className={cn("inline-flex items-center gap-1.5 rounded px-2.5 py-1", !isHtml ? "bg-accent text-accent-ink" : "text-ink-2 hover:text-ink")}><LayoutList className="size-3.5" /> Built from blocks</button>
+            <button type="button" role="radio" aria-checked={isHtml} onClick={() => set({ format: "html" })} className={cn("inline-flex items-center gap-1.5 rounded px-2.5 py-1", isHtml ? "bg-accent text-accent-ink" : "text-ink-2 hover:text-ink")}><Code2 className="size-3.5" /> HTML design</button>
           </div>
           {isHtml ? (
             <div className="flex flex-col gap-3">
@@ -200,7 +200,7 @@ export function TemplateEditor({ scopeKey, base, id, initial, readOnly }: { scop
               <p className="min-w-0 flex-1 truncate text-xs text-muted">Subject: <span className="text-ink">{preview.subject}</span> · sample client “Thandi”</p>
               <div className="inline-flex rounded-md border border-hairline-strong p-0.5" role="radiogroup" aria-label="Preview size">
                 {([["desktop", Monitor, "Desktop"], ["mobile", Smartphone, "Mobile"], ["text", FileText, "Plain text"]] as const).map(([k, Icon, label]) => (
-                  <button key={k} type="button" role="radio" aria-checked={device === k} aria-label={label} title={label} onClick={() => setDevice(k)} className={cn("rounded px-2 py-1", device === k ? "bg-navy text-white" : "text-ink-2 hover:text-ink")}><Icon className="size-3.5" /></button>
+                  <button key={k} type="button" role="radio" aria-checked={device === k} aria-label={label} title={label} onClick={() => setDevice(k)} className={cn("rounded px-2 py-1", device === k ? "bg-accent text-accent-ink" : "text-ink-2 hover:text-ink")}><Icon className="size-3.5" /></button>
                 ))}
               </div>
             </div>

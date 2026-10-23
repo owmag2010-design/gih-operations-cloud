@@ -15,7 +15,7 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-accent text-white hover:bg-accent-hover",
+        primary: "bg-accent text-accent-ink hover:bg-accent-hover",
         secondary: "border border-hairline-strong bg-surface text-ink hover:bg-sunken",
         ghost: "text-ink-2 hover:bg-sunken hover:text-ink",
         danger: "border border-danger/30 bg-surface text-danger hover:bg-danger-soft",
@@ -99,7 +99,7 @@ export function Badge({ tone = "neutral", className, ...props }: React.HTMLAttri
 }
 
 export function Panel({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
-  return <section className={cn("rounded-lg border border-hairline bg-surface", className)} {...props} />;
+  return <section className={cn("rounded-2xl border border-hairline bg-surface shadow-[0_1px_0_rgba(0,0,0,.02)]", className)} {...props} />;
 }
 
 export function PanelHeader({ title, description, actions }: { title: string; description?: React.ReactNode; actions?: React.ReactNode }) {

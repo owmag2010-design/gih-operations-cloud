@@ -22,7 +22,7 @@ export function AuthShell({ title, description, children }: { title: string; des
       <main className="flex flex-col items-center justify-center bg-paper px-4 py-12">
         <div className="w-full max-w-[380px]">
           <HubLogo className="mb-10 h-5 w-auto lg:hidden" />
-          <p className="mb-2 text-[11px] font-medium tracking-[0.2em] text-hub-red uppercase">Global Immigration Hub</p>
+          <p className="mb-2 text-[11px] font-medium tracking-[0.2em] text-hub-red-deep uppercase">Global Immigration Hub</p>
           <h1 className="font-display text-[34px] leading-tight text-ink">{title}</h1>
           {description ? <div className="mt-2 text-sm text-muted">{description}</div> : null}
           <div className="mt-7">{children}</div>

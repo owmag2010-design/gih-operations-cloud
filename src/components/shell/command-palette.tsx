@@ -54,12 +54,12 @@ export function CommandPalette({ navigation, quickActions }: { navigation: Link[
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 w-56 items-center gap-2 rounded-md border border-hairline bg-surface px-2.5 text-[13px] text-muted hover:border-hairline-strong max-sm:w-9 max-sm:justify-center max-sm:px-0"
+        className="flex h-10 items-center gap-2.5 rounded-full border border-hairline-strong bg-surface px-3.5 text-sm text-muted hover:border-ink-2/40 max-2xl:w-10 max-2xl:justify-center max-2xl:px-0 2xl:w-64"
         aria-label="Search and jump (Ctrl K)"
       >
         <Search className="size-4" />
-        <span className="max-sm:hidden">Search or jump to…</span>
-        <kbd className="ml-auto rounded border border-hairline px-1 text-[11px] text-muted max-sm:hidden">Ctrl K</kbd>
+        <span className="max-2xl:sr-only">Search clients, enquiries, pages…</span>
+        <kbd className="ml-auto rounded-md border border-hairline-strong px-1.5 text-[11px] text-muted max-2xl:hidden">Ctrl K</kbd>
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent title="Search and jump" description="Find leads, clients and enquiries you can access, or go to a page." className="[&>div:last-child]:p-0">

@@ -174,6 +174,8 @@ export const users = pgTable("users", {
   mfaLastTimeStep: integer("mfa_last_time_step"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
+  /** Interface theme the person chose: dark (default), light, or follow the device. */
+  uiTheme: text("ui_theme").notNull().default("light"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

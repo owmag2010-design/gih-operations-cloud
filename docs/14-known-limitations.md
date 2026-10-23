@@ -44,3 +44,5 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L34 | Gmail's `gmail.modify` scope is "restricted": for personal Gmail accounts Google requires app verification; in testing mode refresh tokens expire after 7 days | Personal Gmail connections would need reconnecting weekly until verified | Use Google Workspace accounts (internal app) or complete verification |
 | L35 | Microsoft 365 bought through GoDaddy can block third-party app consent | Connecting hello@thegih.com may need GoDaddy/Microsoft admin consent | Grant admin consent in Entra ID; if blocked, keep forwarding for that mailbox |
 | L36 | Search matches subjects, people and message text with simple pattern matching | Fine at current volumes; slower at hundreds of thousands of messages | Full-text index when needed |
+| L37 | "Coming up" on My day lists lead follow-ups only | Consultations, submissions and deadlines are not shown yet | Tasks & Calendar (Milestone 2) |
+| L38 | Before the page hydrates, menus and dialogs opened very early use the Hub accent | Cosmetic, lasts well under a second | None needed |

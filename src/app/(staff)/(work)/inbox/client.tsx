@@ -264,8 +264,8 @@ export function ConversationView({ data, backHref }: { data: Data; backHref: str
           {/* Reply or note */}
           <div ref={composerRef} className="border-t border-hairline bg-surface px-4 py-4 lg:px-6">
             <div className="mb-3 flex gap-1 text-[13px]" role="tablist">
-              {data.canSend ? <button type="button" role="tab" aria-selected={tab === "reply"} onClick={() => setTab("reply")} className={cn("rounded-md px-3 py-1.5", tab === "reply" ? "bg-navy text-white" : "text-ink-2 hover:bg-sunken")}>Email the client</button> : null}
-              <button type="button" role="tab" aria-selected={tab === "note"} onClick={() => setTab("note")} className={cn("rounded-md px-3 py-1.5", tab === "note" ? "bg-warn text-white" : "text-ink-2 hover:bg-sunken")}>Internal note</button>
+              {data.canSend ? <button type="button" role="tab" aria-selected={tab === "reply"} onClick={() => setTab("reply")} className={cn("rounded-md px-3 py-1.5", tab === "reply" ? "bg-accent text-accent-ink" : "text-ink-2 hover:bg-sunken")}>Email the client</button> : null}
+              <button type="button" role="tab" aria-selected={tab === "note"} onClick={() => setTab("note")} className={cn("rounded-md px-3 py-1.5", tab === "note" ? "bg-warn text-paper" : "text-ink-2 hover:bg-sunken")}>Internal note</button>
             </div>
             {tab === "note" ? (
               <NoteForm threadId={data.thread.id} onSaved={() => router.refresh()} />
@@ -294,7 +294,7 @@ function MessageCard({ m, canSend, onReply }: { m: Msg; canSend: boolean; onRepl
   return (
     <li className={cn("rounded-lg border bg-surface", m.direction === "outbound" ? "border-navy/15" : "border-hairline", forged && "border-danger/40")}>
       <div className="flex flex-wrap items-start gap-3 border-b border-hairline px-4 py-3">
-        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", m.direction === "outbound" ? "bg-navy text-white" : "bg-sky text-ink")} aria-hidden="true">{initials(name)}</span>
+        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", m.direction === "outbound" ? "bg-accent text-accent-ink" : "bg-sky text-ink")} aria-hidden="true">{initials(name)}</span>
         <div className="min-w-0 flex-1 text-xs text-muted">
           <p className="flex flex-wrap items-baseline gap-x-2">
             <span className="text-[13px] font-medium text-ink">{name}</span>
@@ -419,7 +419,7 @@ function SidePanel({ data, onRun, pending }: { data: Data; onRun: (fn: () => Pro
 function RecordCard({ href, kind, title, refText, lines }: { href: string; kind: string; title: string; refText: string; lines: (string | null)[] }) {
   return (
     <Link href={href} className="block rounded-lg border border-hairline bg-paper p-3 hover:border-navy">
-      <p className="text-[11px] font-medium tracking-wide text-hub-red uppercase">{kind} · {refText}</p>
+      <p className="practice-ink text-[11px] font-medium tracking-wide uppercase" style={{ "--c-l": "#b3141f", "--c-d": "#ff8f96" } as React.CSSProperties}>{kind} · {refText}</p>
       <p className="mt-0.5 text-[14px] font-medium text-ink">{title}</p>
       {lines.filter(Boolean).map((l) => <p key={l} className="truncate text-xs text-muted">{l}</p>)}
     </Link>

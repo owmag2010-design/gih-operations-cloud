@@ -235,7 +235,7 @@ export function Composer({ initial, onDone, onCancel, autoFocus = true }: { init
         {!template ? (
           <div className="inline-flex rounded-md border border-hairline-strong p-0.5 text-xs" role="radiogroup" aria-label="Look">
             {(["plain", "branded"] as const).map((f) => (
-              <button key={f} type="button" role="radio" aria-checked={format === f} onClick={() => { setFormat(f); touch(); }} className={cn("rounded px-2.5 py-1", format === f ? "bg-navy text-white" : "text-ink-2 hover:text-ink")}>
+              <button key={f} type="button" role="radio" aria-checked={format === f} onClick={() => { setFormat(f); touch(); }} className={cn("rounded px-2.5 py-1", format === f ? "bg-accent text-accent-ink" : "text-ink-2 hover:text-ink")}>
                 {f === "plain" ? "Plain message" : "Branded letter"}
               </button>
             ))}
@@ -308,7 +308,7 @@ export function Composer({ initial, onDone, onCancel, autoFocus = true }: { init
             <span>To <span className="text-ink">{[...preview.to, ...preview.cc.map((c) => `cc ${c}`), ...preview.bcc.map((c) => `bcc ${c}`)].join(", ")}</span></span>
             <div className="ml-auto inline-flex rounded-md border border-hairline-strong p-0.5" role="radiogroup" aria-label="Preview size">
               {([["desktop", Monitor, "Desktop"], ["mobile", Smartphone, "Mobile"], ["text", FileText, "Plain text"]] as const).map(([k, Icon, label]) => (
-                <button key={k} type="button" role="radio" aria-checked={device === k} aria-label={label} title={label} onClick={() => setDevice(k)} className={cn("rounded px-2 py-1", device === k ? "bg-navy text-white" : "text-ink-2 hover:text-ink")}><Icon className="size-3.5" /></button>
+                <button key={k} type="button" role="radio" aria-checked={device === k} aria-label={label} title={label} onClick={() => setDevice(k)} className={cn("rounded px-2 py-1", device === k ? "bg-accent text-accent-ink" : "text-ink-2 hover:text-ink")}><Icon className="size-3.5" /></button>
               ))}
             </div>
           </div>
