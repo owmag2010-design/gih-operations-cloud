@@ -47,11 +47,11 @@ export function SidebarNav({ items, future }: { items: NavItem[]; future: Future
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] text-ink-2 hover:bg-sunken hover:text-ink",
-                  active && "bg-sunken font-medium text-ink",
+                  "relative flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] text-white/75 hover:bg-white/[0.07] hover:text-white",
+                  active && "bg-white/[0.11] font-medium text-white before:absolute before:inset-y-1.5 before:-left-2 before:w-[3px] before:rounded-full before:bg-hub-red",
                 )}
               >
-                <Icon className={cn("size-4 text-muted", active && "text-ink")} />
+                <Icon className={cn("size-4 text-white/50", active && "text-white")} />
                 {item.label}
               </Link>
             </li>
@@ -64,7 +64,7 @@ export function SidebarNav({ items, future }: { items: NavItem[]; future: Future
             type="button"
             onClick={() => setShowFuture((v) => !v)}
             aria-expanded={showFuture}
-            className="flex w-full items-center justify-between rounded-md px-2.5 py-1 text-xs text-muted hover:text-ink"
+            className="flex w-full items-center justify-between rounded-md px-2.5 py-1 text-xs text-white/50 hover:text-white"
           >
             <span>Not yet released</span>
             <span aria-hidden="true">{showFuture ? "Hide" : "Show"}</span>
@@ -72,7 +72,7 @@ export function SidebarNav({ items, future }: { items: NavItem[]; future: Future
           {showFuture ? (
             <ul className="mt-1 flex flex-col">
               {future.map((f) => (
-                <li key={f.label} className="flex h-7 items-center justify-between px-2.5 text-[13px] text-muted/80">
+                <li key={f.label} className="flex h-7 items-center justify-between px-2.5 text-[13px] text-white/40">
                   <span>{f.label}</span>
                   <span className="text-[11px]">Release {f.release}</span>
                 </li>
@@ -89,13 +89,13 @@ export function WorkspaceSwitcher({ options, currentKey }: { options: WorkspaceO
   const current = options.find((o) => o.key === currentKey) ?? options[0];
   return (
     <DM.Root>
-      <DM.Trigger className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-sunken" aria-label="Switch workspace">
+      <DM.Trigger className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-white/[0.07]" aria-label="Switch workspace">
         {current?.kind === "firm" ? <FirmSwatch color={current.color!} label={current.label} /> : <HubMark className="size-7 shrink-0" />}
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-semibold text-ink">{current?.label ?? "No workspace"}</span>
-          <span className="block truncate text-xs text-muted">{current?.kind === "firm" ? "Firm workspace" : "Global Immigration Hub"}</span>
+          <span className="block truncate text-[13px] font-semibold text-white">{current?.label ?? "No workspace"}</span>
+          <span className="block truncate text-xs text-white/55">{current?.kind === "firm" ? "Partner firm workspace" : "Global Immigration Hub"}</span>
         </span>
-        <ChevronsUpDown className="size-4 text-muted" />
+        <ChevronsUpDown className="size-4 text-white/50" />
       </DM.Trigger>
       <DM.Portal>
         <DM.Content align="start" sideOffset={6} className="z-50 w-[232px] rounded-lg border border-hairline bg-surface p-1 shadow-[0_8px_30px_-10px_rgba(36,34,31,.3)]">
@@ -119,7 +119,7 @@ export function FirmSwatch({ color, label, small }: { color: string; label: stri
   const initials = label.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   return (
     <span
-      className={cn("flex shrink-0 items-center justify-center rounded-md font-semibold text-white", small ? "size-5 text-[9px]" : "size-7 text-[11px]")}
+      className={cn("flex shrink-0 items-center justify-center rounded-md font-semibold text-white ring-1 ring-white/20", small ? "size-5 text-[9px]" : "size-7 text-[11px]")}
       style={{ background: color }}
       aria-hidden="true"
     >
@@ -131,13 +131,13 @@ export function FirmSwatch({ color, label, small }: { color: string; label: stri
 export function UserMenu({ name, email }: { name: string; email: string }) {
   return (
     <DM.Root>
-      <DM.Trigger className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-sunken">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sunken text-[11px] font-semibold text-ink-2" aria-hidden="true">
+      <DM.Trigger className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-white/[0.07]">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/15 text-[11px] font-semibold text-white" aria-hidden="true">
           {name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-medium text-ink">{name}</span>
-          <span className="block truncate text-xs text-muted">{email}</span>
+          <span className="block truncate text-[13px] font-medium text-white">{name}</span>
+          <span className="block truncate text-xs text-white/55">{email}</span>
         </span>
       </DM.Trigger>
       <DM.Portal>

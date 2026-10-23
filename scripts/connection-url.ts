@@ -18,7 +18,7 @@ export function migrationUrl(): string {
     problems.push("it is not a valid URL (if the password has symbols such as @ # / ? %, percent-encode them)");
   }
   if (parsed) {
-    if (!parsed.hostname || !parsed.hostname.includes(".")) problems.push(`the host "${parsed.hostname}" doesn't look like a database host`);
+    if (!parsed.hostname) problems.push("the host is missing");
     if (!parsed.username) problems.push("the user name is missing");
     if (!parsed.password) problems.push("the password is missing");
     if (parsed.password && /^\[.*\]$/.test(decodeURIComponent(parsed.password))) problems.push("the password still has the [ ] placeholder brackets");

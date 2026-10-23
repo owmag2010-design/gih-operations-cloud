@@ -62,7 +62,7 @@ function Footer({ s, st, b }: { s: ProposalSnapshot; st: ReturnType<typeof style
   );
 }
 
-function Paragraphs({ text, style }: { text: string; style: object }) {
+function Paragraphs({ text, style }: { text: string; style: import("@react-pdf/types").Style }) {
   return (
     <>
       {text.split(/\n{2,}/).map((para, i) => (

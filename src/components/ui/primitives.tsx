@@ -118,7 +118,7 @@ export function PageHeader({ title, description, actions, meta }: { title: React
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="text-[22px] leading-tight font-semibold tracking-[-0.01em] text-ink">{title}</h1>
+        <h1 className="font-display text-[28px] leading-tight text-ink">{title}</h1>
         {description ? <p className="mt-1 max-w-[70ch] text-sm text-muted">{description}</p> : null}
         {meta ? <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div> : null}
       </div>

@@ -1,9 +1,10 @@
-/** Simple Hub monogram in GIH red. (Placeholder until the official logo file is added to /public.) */
-export function HubMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
-      <rect width="32" height="32" rx="7" fill="var(--hub-red)" />
-      <path d="M22.5 11.2A8 8 0 1 0 24 17h-7.2" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
+/* eslint-disable @next/next/no-img-element */
+/** Global Immigration Hub icon (red circle G). Official artwork from /public/brand. */
+export function HubMark({ className, variant = "red" }: { className?: string; variant?: "red" | "white" | "navy" }) {
+  return <img src={`/brand/gih-icon-${variant}.svg`} alt="" aria-hidden="true" className={className} />;
+}
+
+/** Full horizontal Global Immigration Hub wordmark. */
+export function HubLogo({ className, tone = "navy" }: { className?: string; tone?: "navy" | "white" }) {
+  return <img src={`/brand/gih-logo-horizontal-${tone}.svg`} alt="Global Immigration Hub" className={className} />;
 }

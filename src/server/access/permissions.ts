@@ -18,6 +18,9 @@ export const GROUP_PERMISSIONS = [
   "routing:manage",
   "metrics:group",
   "audit:view",
+  "hub_email:send",
+  "hub_templates:manage",
+  "mailboxes:manage",
 ] as const;
 
 export const FIRM_PERMISSIONS = [
@@ -47,6 +50,9 @@ export const FIRM_PERMISSIONS = [
   "proposals:edit",
   "proposals:approve",
   "proposals:release",
+  "email:view",
+  "email:send",
+  "templates:manage",
 ] as const;
 
 export type GroupPermission = (typeof GROUP_PERMISSIONS)[number];
@@ -68,6 +74,9 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "routing:manage": "Manage routing rules",
   "metrics:group": "View group metrics",
   "audit:view": "View organisation audit log",
+  "hub_email:send": "Send and reply from the Hub inbox",
+  "hub_templates:manage": "Manage the Hub's shared email templates",
+  "mailboxes:manage": "Manage inbound mailboxes and sending addresses",
   "firm:view": "Open the firm workspace",
   "firm:manage": "Manage firm settings and pipeline",
   "team:view": "View firm team",
@@ -94,6 +103,9 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "proposals:edit": "Edit draft proposals",
   "proposals:approve": "Approve proposals",
   "proposals:release": "Send proposals to clients",
+  "email:view": "Read the firm inbox and email history",
+  "email:send": "Send emails to leads and clients",
+  "templates:manage": "Manage the firm's email templates",
 };
 
 export function isGroupPermission(p: string): p is GroupPermission {
@@ -118,7 +130,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
     name: "Group Operations Administrator",
     scope: "group",
     description: "Triages Hub enquiries and watches group metrics.",
-    permissions: ["firms:view", "staff:view", "intake:view", "intake:create", "intake:route", "metrics:group", "audit:view"],
+    permissions: ["firms:view", "staff:view", "intake:view", "intake:create", "intake:route", "metrics:group", "audit:view", "hub_email:send"],
   },
   {
     key: "firm_admin",
@@ -135,7 +147,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
     permissions: [
       "firm:view", "team:view", "leads:view_all", "leads:create", "leads:edit", "leads:assign",
       "leads:convert", "clients:view_all", "clients:create", "clients:edit", "metrics:firm",
-      "proposals:view", "proposals:create", "proposals:edit",
+      "proposals:view", "proposals:create", "proposals:edit", "email:view", "email:send",
     ],
   },
   {
@@ -143,7 +155,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
     name: "Case Manager",
     scope: "firm",
     description: "Manages client matters.",
-    permissions: ["firm:view", "team:view", "leads:view_all", "leads:edit", "clients:view_all", "clients:edit", "metrics:firm", "proposals:view"],
+    permissions: ["firm:view", "team:view", "leads:view_all", "leads:edit", "clients:view_all", "clients:edit", "metrics:firm", "proposals:view", "email:view", "email:send"],
   },
   {
     key: "reviewer",

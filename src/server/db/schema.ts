@@ -65,7 +65,11 @@ export const activityType = pgEnum("activity_type", [
   "converted",
   "routed",
   "proposal",
+  "email",
 ]);
+export const emailDirection = pgEnum("email_direction", ["inbound", "outbound"]);
+export const emailThreadStatus = pgEnum("email_thread_status", ["open", "closed"]);
+export const emailMessageStatus = pgEnum("email_message_status", ["received", "queued", "sent", "delivered", "bounced", "complained", "failed", "not_configured"]);
 export const proposalStatus = pgEnum("proposal_status", [
   "draft",
   "in_review",
@@ -667,3 +671,118 @@ export const emailOutbox = pgTable("email_outbox", {
   error: text("error"),
   createdAt: createdAt(),
 });
+
+/* ───────────────────────── Email: mailboxes, templates, threads ───────────────────────── */
+
+/**
+ * An address the dashboard receives at (Resend receiving domain) and the
+ * identity it sends as. firm_id null = the Hub's own mailbox.
+ */
+export const mailboxes = pgTable(
+  "mailboxes",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    label: text("label").notNull(),
+    inboundAddress: citext("inbound_address").notNull(),
+    forwardedFrom: text("forwarded_from"),
+    fromName: text("from_name").notNull(),
+    fromAddress: citext("from_address").notNull(),
+    signature: text("signature"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("mailboxes_inbound_uq").on(t.inboundAddress)],
+);
+
+export type EmailBlock =
+  | { type: "heading"; text: string }
+  | { type: "paragraph"; text: string }
+  | { type: "button"; label: string; url: string }
+  | { type: "details"; rows: { label: string; value: string }[] }
+  | { type: "notice"; text: string }
+  | { type: "divider" };
+
+export const emailTemplates = pgTable(
+  "email_templates",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    name: text("name").notNull(),
+    category: text("category").notNull().default("General"),
+    subject: text("subject").notNull(),
+    preheader: text("preheader"),
+    blocks: jsonb("blocks").$type<EmailBlock[]>().notNull().default([]),
+    isActive: boolean("is_active").notNull().default(true),
+    version: integer("version").notNull().default(1),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("email_templates_scope_idx").on(t.orgId, t.firmId)],
+);
+
+export const emailThreads = pgTable(
+  "email_threads",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    mailboxId: uuid("mailbox_id").references(() => mailboxes.id),
+    subject: text("subject").notNull(),
+    counterpartEmail: citext("counterpart_email").notNull(),
+    counterpartName: text("counterpart_name"),
+    leadId: uuid("lead_id"),
+    clientId: uuid("client_id"),
+    intakeItemId: uuid("intake_item_id").references(() => intakeItems.id, { onDelete: "set null" }),
+    status: emailThreadStatus("status").notNull().default("open"),
+    unread: boolean("unread").notNull().default(false),
+    assignedToId: uuid("assigned_to_id").references(() => users.id, { onDelete: "set null" }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("email_threads_firm_last_idx").on(t.firmId, t.lastMessageAt),
+    index("email_threads_org_last_idx").on(t.orgId, t.lastMessageAt),
+    index("email_threads_counterpart_idx").on(t.counterpartEmail),
+  ],
+);
+
+export type EmailAttachmentMeta = { id: string; filename: string; contentType: string; size: number | null };
+
+export const emailMessages = pgTable(
+  "email_messages",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    threadId: uuid("thread_id").notNull().references(() => emailThreads.id, { onDelete: "cascade" }),
+    direction: emailDirection("direction").notNull(),
+    status: emailMessageStatus("status").notNull(),
+    providerId: text("provider_id"),
+    messageId: text("message_id"),
+    inReplyTo: text("in_reply_to"),
+    fromAddress: citext("from_address").notNull(),
+    fromName: text("from_name"),
+    toAddresses: text("to_addresses").array().notNull().default(sql`'{}'::text[]`),
+    ccAddresses: text("cc_addresses").array().notNull().default(sql`'{}'::text[]`),
+    subject: text("subject").notNull(),
+    textBody: text("text_body"),
+    htmlBody: text("html_body"),
+    templateId: uuid("template_id").references(() => emailTemplates.id, { onDelete: "set null" }),
+    attachments: jsonb("attachments").$type<EmailAttachmentMeta[]>().notNull().default([]),
+    authResult: text("auth_result"),
+    error: text("error"),
+    sentById: uuid("sent_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("email_messages_thread_idx").on(t.threadId, t.createdAt),
+    uniqueIndex("email_messages_provider_uq").on(t.providerId),
+    index("email_messages_message_id_idx").on(t.messageId),
+  ],
+);

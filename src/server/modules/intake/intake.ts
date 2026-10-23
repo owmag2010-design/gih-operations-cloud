@@ -32,7 +32,7 @@ async function loadRules(tx: Tx, orgId: string): Promise<RuleLike[]> {
 }
 
 /** Store an enquiry and attach a routing suggestion. Idempotent on (source, sourceRef). */
-async function storeIntake(tx: Tx, orgId: string, raw: unknown, actorId: string | null) {
+export async function storeIntake(tx: Tx, orgId: string, raw: unknown, actorId: string | null) {
   const input = parseOrThrow(intakeSchema, raw);
   if (input.sourceRef) {
     const [existing] = await tx.select().from(intakeItems).where(and(eq(intakeItems.source, input.source), eq(intakeItems.sourceRef, input.sourceRef))).limit(1);

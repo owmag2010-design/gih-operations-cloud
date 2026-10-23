@@ -64,6 +64,20 @@
       "when": 1792577520523,
       "tag": "0008_proposals_security",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792744226126,
+      "tag": "0009_email",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792744227229,
+      "tag": "0010_email_security",
+      "breakpoints": true
     }
   ]
 }

@@ -29,6 +29,8 @@ const schema = z.object({
     }),
   INTAKE_WEBHOOK_SECRET: z.string().trim().min(32, "INTAKE_WEBHOOK_SECRET must be at least 32 characters"),
   RESEND_API_KEY: z.string().optional().default(""),
+  /** Signing secret of the Resend webhook (whsec_…) for received mail and delivery events. */
+  RESEND_WEBHOOK_SECRET: z.string().optional().default(""),
   EMAIL_FROM: z.string().default("Global Immigration Hub <hello@thegih.com>"),
 });
 

@@ -1,25 +1,31 @@
 @import "tailwindcss";
 
-/* GIH Operations Cloud tokens. See docs/06-design-system.md. */
+/* GIH Operations Cloud tokens: Global Immigration Hub brand (website v4). See docs/06-design-system.md. */
 :root {
-  --paper: #fbfaf8;
+  --paper: #faf9f6;
   --surface: #ffffff;
-  --sunken: #f2f0ec;
-  --hairline: #e3dfd8;
-  --hairline-strong: #cfc9bf;
-  --ink: #24221f;
-  --ink-2: #47433d;
-  --muted: #6e685f;
-  --accent: #2b4c7e;
-  --accent-hover: #233f69;
-  --accent-soft: #e9eef6;
+  --sunken: #f3f2ee;
+  --hairline: #e6e7e5;
+  --hairline-strong: #d9dbd8;
+  --ink: #202326;
+  --ink-2: #3a3f44;
+  --muted: #60666b;
+  --navy: #1b263b;
+  --navy-2: #24324c;
+  --navy-3: #30405f;
+  --sky: #eaf1f6;
+  --accent: #1b263b;
+  --accent-hover: #24324c;
+  --accent-soft: #eaf1f6;
   --danger: #a3352b;
   --danger-soft: #f8ebe9;
   --warn: #8a5a0b;
   --warn-soft: #fbf1df;
   --ok: #2e6a4a;
   --ok-soft: #e7f2ec;
-  --hub-red: #c8312b;
+  --hub-red: #dd1929;
+  --hub-red-deep: #b8121f;
+  --hub-red-tint: #fbebec;
   --firm: #3d3a36; /* overridden per firm workspace */
 }
 
@@ -42,7 +48,15 @@
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-firm: var(--firm);
+  --color-navy: var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-navy-3: var(--navy-3);
+  --color-sky: var(--sky);
+  --color-hub-red: var(--hub-red);
+  --color-hub-red-deep: var(--hub-red-deep);
+  --color-hub-red-tint: var(--hub-red-tint);
   --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), Georgia, "Times New Roman", serif;
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 10px;
@@ -50,6 +64,8 @@
 
 html { background: var(--paper); color: var(--ink); }
 body { font-family: var(--font-sans); font-size: 14px; line-height: 1.5; background: var(--paper); }
+
+.font-display { font-family: var(--font-display), Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
 
 .num { font-variant-numeric: tabular-nums; }
 

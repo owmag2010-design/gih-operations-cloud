@@ -12,6 +12,53 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_ROLES } from "../src/server/access/permissions";
+import type { EmailBlock } from "../src/server/db/schema";
+
+/** Starter templates: wording only, no client data. Each firm can copy and adapt them. */
+const STARTER_TEMPLATES: { name: string; category: string; subject: string; preheader: string; blocks: EmailBlock[] }[] = [
+  {
+    name: "Enquiry received", category: "Enquiries", subject: "We've received your enquiry, {{first_name}}", preheader: "What happens next with your immigration enquiry.",
+    blocks: [
+      { type: "heading", text: "Thank you, {{first_name}}" },
+      { type: "paragraph", text: "We've received your enquiry and a specialist will review it. You'll hear from us within one working day with the right next step for your situation." },
+      { type: "notice", text: "Your reference is **{{reference}}**. Please quote it if you contact us." },
+      { type: "paragraph", text: "If anything is urgent, such as a deadline or a visa expiring soon, reply to this email and tell us the date." },
+    ],
+  },
+  {
+    name: "Book a consultation", category: "Consultations", subject: "Your consultation with {{firm_name}}", preheader: "Choose a time that suits you.",
+    blocks: [
+      { type: "heading", text: "Let's talk through your options" },
+      { type: "paragraph", text: "Hi {{first_name}},\n\nThe best next step is a consultation, where we look at your circumstances and confirm the right route before you spend money on documents." },
+      { type: "details", rows: [{ label: "Length", value: "60 minutes" }, { label: "Where", value: "Video call or at a Global Immigration Hub centre" }] },
+      { type: "button", label: "Choose a time", url: "https://thegih.com" },
+    ],
+  },
+  {
+    name: "Documents needed", category: "Matters", subject: "Documents we need for your application", preheader: "A short list of what to send us next.",
+    blocks: [
+      { type: "heading", text: "Your next documents" },
+      { type: "paragraph", text: "Hi {{first_name}},\n\nTo keep your application moving, please send us the documents below. Clear phone photos or scans are fine." },
+      { type: "details", rows: [{ label: "Document", value: "Details" }] },
+      { type: "notice", text: "Reply to this email with the documents attached. Quote **{{reference}}**." },
+    ],
+  },
+  {
+    name: "Proposal follow-up", category: "Proposals", subject: "Following up on your proposal", preheader: "Any questions about the proposal we sent?",
+    blocks: [
+      { type: "paragraph", text: "Hi {{first_name}},\n\nI wanted to check whether you've had a chance to look at the proposal we sent, and whether you have any questions about the scope or fees." },
+      { type: "paragraph", text: "If you're ready to begin, accepting the proposal and paying the deposit lets us start straight away." },
+    ],
+  },
+  {
+    name: "Payment received", category: "Finance", subject: "Payment received, thank you", preheader: "We've received your payment and work is under way.",
+    blocks: [
+      { type: "heading", text: "Payment received" },
+      { type: "paragraph", text: "Hi {{first_name}},\n\nThank you. We've received your payment and your matter is now active. We'll send your document checklist shortly." },
+      { type: "notice", text: "Reference: **{{reference}}**" },
+    ],
+  },
+];
 import * as s from "../src/server/db/schema";
 import { DEFAULT_PIPELINE } from "../src/server/modules/crm/pipeline-defaults";
 import { parseFeeSchedule } from "../src/server/modules/services/fee-schedule";
@@ -147,6 +194,25 @@ export async function runSeed(db: NodePgDatabase<typeof s>, log: (m: string) => 
       insert into service_price_versions (firm_id, service_id, version, name, currency, total_minor, deposit_minor, lines, add_ons, is_active, reason, created_at)
       select s.firm_id, s.id, 1, s.name, s.currency, s.total_minor, s.deposit_minor, s.lines, s.add_ons, s.is_active, coalesce(s.source_note, 'Initial fee schedule'), s.created_at
       from services s where not exists (select 1 from service_price_versions v where v.service_id = s.id)`);
+    // Email: one receiving address per inbox on the Resend receiving domain, and starter templates.
+    const MAIL_DOMAIN = process.env.INBOUND_EMAIL_DOMAIN ?? "in.thegih.com";
+    const boxes: { firm: string | null; label: string; local: string; forwardedFrom: string; fromName: string; fromAddress: string }[] = [
+      { firm: null, label: "Global Immigration Hub", local: "hello", forwardedFrom: "hello@thegih.com", fromName: "Global Immigration Hub", fromAddress: "hello@thegih.com" },
+      { firm: "veritas", label: "Veritas Emigrate", local: "veritas", forwardedFrom: "Veritas mailbox", fromName: "Veritas Emigrate", fromAddress: "veritas@thegih.com" },
+      { firm: "mimshac", label: "Mimshac Group", local: "mimshac", forwardedFrom: "owen@mimshacgroup.com", fromName: "Mimshac Group", fromAddress: "mimshac@thegih.com" },
+      { firm: "nextmove", label: "Nextmove Advisory", local: "nextmove", forwardedFrom: "Nextmove mailbox", fromName: "Nextmove Advisory", fromAddress: "nextmove@thegih.com" },
+    ];
+    for (const b of boxes) {
+      await tx
+        .insert(s.mailboxes)
+        .values({ orgId: org.id, firmId: b.firm ? firmIds[b.firm] : null, label: b.label, inboundAddress: `${b.local}@${MAIL_DOMAIN}`, forwardedFrom: b.forwardedFrom, fromName: b.fromName, fromAddress: b.fromAddress })
+        .onConflictDoNothing({ target: s.mailboxes.inboundAddress });
+    }
+    const [{ n: templateCount }] = await tx.select({ n: sql<number>`count(*)::int` }).from(s.emailTemplates).where(eq(s.emailTemplates.orgId, org.id));
+    if (templateCount === 0) {
+      await tx.insert(s.emailTemplates).values(STARTER_TEMPLATES.map((t) => ({ ...t, orgId: org.id, firmId: null })));
+      log(`  + ${STARTER_TEMPLATES.length} starter email templates (Hub, shared with firms)`);
+    }
     const warnings = parsed.filter((p) => p.warnings.length);
     log(`  services: ${parsed.length} per firm (${warnings.length} with notes)`);
     for (const w of warnings) log(`    ! ${w.name}: ${w.warnings.join(" ")}`);

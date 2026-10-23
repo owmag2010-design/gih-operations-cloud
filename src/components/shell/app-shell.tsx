@@ -1,5 +1,7 @@
 import type { AccessContext } from "@/server/access/context";
 import { CommandPalette } from "./command-palette";
+import Link from "next/link";
+import { HubLogo } from "../hub-mark";
 import { MobileNavToggle, SidebarNav, WorkspaceSwitcher, UserMenu } from "./client";
 import type { FutureItem, NavItem, Workspace } from "./nav";
 
@@ -44,15 +46,19 @@ export function AppShell({
     <div className="min-h-screen lg:grid lg:grid-cols-[248px_1fr]" style={{ ["--firm" as string]: color }}>
       <input type="checkbox" id="nav-toggle" className="peer sr-only" aria-hidden="true" tabIndex={-1} />
       <aside
-        className="fixed inset-y-0 left-0 z-30 flex w-[248px] -translate-x-full flex-col border-r border-hairline bg-surface transition-transform peer-checked:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0"
+        className="fixed inset-y-0 left-0 z-30 flex w-[248px] -translate-x-full flex-col bg-navy text-white transition-transform peer-checked:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0"
         aria-label="Main"
       >
         <div className="absolute inset-y-0 left-0 w-[3px] bg-firm" aria-hidden="true" />
-        <div className="border-b border-hairline px-3 py-3">
+        <Link href="/" className="block px-5 pt-5 pb-4" aria-label="Global Immigration Hub home">
+          <HubLogo tone="white" className="h-[18px] w-auto" />
+          <span className="mt-1.5 block text-[10px] font-medium tracking-[0.18em] text-white/55 uppercase">Operations Cloud</span>
+        </Link>
+        <div className="border-y border-white/10 px-3 py-2.5">
           <WorkspaceSwitcher options={options} currentKey={current?.key ?? null} />
         </div>
         <SidebarNav items={nav} future={future} />
-        <div className="border-t border-hairline px-3 py-3">
+        <div className="border-t border-white/10 px-3 py-3">
           <UserMenu name={ctx.user.name} email={ctx.user.email} />
         </div>
       </aside>
