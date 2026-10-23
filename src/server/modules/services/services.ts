@@ -9,13 +9,17 @@ import { NotFoundError, ValidationError } from "../../errors";
 import { parseOrThrow } from "../../validation";
 import { slugify } from "./fee-schedule";
 
+/** Largest single amount accepted (R 10 million), so totals stay within the database's integer range. */
+export const MAX_MINOR = 1_000_000_000;
+
 /** "12,500", "R 12 500.00" or "12500" → 1250000 minor units. */
 export function parseMoney(raw: unknown): number | null {
-  if (typeof raw === "number" && Number.isFinite(raw)) return Math.round(raw * 100);
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw >= 0 && raw * 100 <= MAX_MINOR ? Math.round(raw * 100) : null;
   if (typeof raw !== "string") return null;
   const cleaned = raw.replace(/[R$A£€\s,]/gi, "").replace(/^ZAR|^AUD|^USD/i, "");
-  if (!/^\d{1,9}(\.\d{1,2})?$/.test(cleaned)) return null;
-  return Math.round(Number(cleaned) * 100);
+  if (!/^\d{1,8}(\.\d{1,2})?$/.test(cleaned)) return null;
+  const minor = Math.round(Number(cleaned) * 100);
+  return minor <= MAX_MINOR ? minor : null;
 }
 
 const money = (label: string) =>
@@ -69,7 +73,7 @@ export async function listCatalogue(ctx: AccessContext, firmId: string, opts: { 
     const rows = await tx
       .select({
         service: services,
-        version: sql<number>`(select max(v.version) from service_price_versions v where v.service_id = ${services.id})`,
+        version: sql<number>`(select max(v.version) from service_price_versions v where v.service_id = services.id)`,
       })
       .from(services)
       .where(and(eq(services.firmId, firmId), opts.activeOnly ? eq(services.isActive, true) : undefined))
@@ -96,6 +100,7 @@ export async function getServiceWithHistory(ctx: AccessContext, firmId: string, 
 
 export async function updateService(ctx: AccessContext, firmId: string, serviceId: string, raw: unknown) {
   ctx.require("services:manage", firmId);
+  if (!z.string().uuid().safeParse(serviceId).success) throw new NotFoundError("Service");
   const input = parseOrThrow(serviceSchema, raw);
   const priced = toRow(input);
   return withScope(ctx.scopeFor(firmId), async (tx) => {

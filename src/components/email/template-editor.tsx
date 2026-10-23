@@ -155,7 +155,7 @@ export function TemplateEditor({ scopeKey, base, id, initial, readOnly }: { scop
         {preview ? (
           <>
             <p className="text-xs text-muted">Subject: <span className="text-ink">{preview.subject}</span> · sample client “Thandi”</p>
-            <EmailFrame html={preview.html} title="Template preview" height={680} />
+            <EmailFrame html={preview.html} title="Template preview" height={680} allowSameSiteImages />
           </>
         ) : (
           <div className="flex h-[300px] items-center justify-center rounded-md border border-dashed border-hairline-strong text-[13px] text-muted">

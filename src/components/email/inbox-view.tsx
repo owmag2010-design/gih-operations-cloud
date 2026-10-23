@@ -48,7 +48,7 @@ export async function InboxView({ ctx, where, scopeKey, base, sp, canSend, canCr
                       <span className={cn("truncate text-[13px]", t.unread ? "font-semibold text-ink" : "text-ink-2")}>{t.counterpartName ?? t.counterpartEmail}</span>
                       <span className="shrink-0 text-[11px] text-muted"><LocalTime value={t.lastMessageAt} mode="relative" /></span>
                     </span>
-                    <span className={cn("mt-0.5 block truncate text-[13px]", t.unread ? "text-ink" : "text-ink-2")}>{t.unread ? <span className="mr-1.5 inline-block size-1.5 rounded-full bg-hub-red align-middle" aria-label="Unread" /> : null}{t.subject}</span>
+                    <span className={cn("mt-0.5 block truncate text-[13px]", t.unread ? "text-ink" : "text-ink-2")}>{t.unread ? <span className="mr-1.5 inline-block size-1.5 rounded-full bg-hub-red align-middle" aria-label="Unread" /> : null}{t.unverified ? <Badge tone="danger" className="mr-1.5">Unverified sender</Badge> : null}{t.subject}</span>
                     <span className="mt-0.5 block truncate text-xs text-muted">{t.lastDirection === "outbound" ? "You: " : ""}{t.preview}</span>
                   </Link>
                 </li>
@@ -83,7 +83,7 @@ export async function InboxView({ ctx, where, scopeKey, base, sp, canSend, canCr
                       <LocalTime value={m.createdAt} />
                       <Badge tone={STATUS_TONE[m.status]}>{STATUS_LABEL[m.status]}</Badge>
                       {m.attachments.length ? <Badge tone="outline">{m.attachments.length} attachment{m.attachments.length === 1 ? "" : "s"}</Badge> : null}
-                      {m.authResult?.includes("dmarc=fail") ? <Badge tone="danger">Sender not verified</Badge> : null}
+                      {m.authResult?.includes("dmarc=fail") ? <Badge tone="danger">Sender not verified: may be forged. Don&apos;t act on payment or bank changes.</Badge> : null}
                     </div>
                     {m.error ? <p className="mb-2 text-xs text-danger">{m.error}</p> : null}
                     <MessageBody id={m.id} text={m.textBody} html={m.htmlBody} />

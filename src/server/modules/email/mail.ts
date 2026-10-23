@@ -22,6 +22,8 @@ import { AccessDeniedError, NotFoundError, ValidationError } from "../../errors"
 import { resendGetReceived, resendSend, type ReceivedEmail } from "../../integrations/resend";
 import { parseOrThrow } from "../../validation";
 import { storeIntake } from "../intake/intake";
+import { loadVisibleLead } from "../crm/leads";
+import { loadVisibleClient } from "../clients/clients";
 import { brandFor, plainBlocks, renderEmail, type MergeValues } from "./render";
 
 /** Where a mailbox, thread or template lives: a firm, or the Hub itself. */
@@ -228,18 +230,14 @@ const composeSchema = z.object({
   cc: z.string().trim().max(500).optional().transform((v) => (v ? v.split(/[,;\s]+/).filter(Boolean) : [])),
 });
 
-async function loadRecipient(tx: Tx, firmId: string, target: { leadId?: string; clientId?: string }): Promise<Recipient> {
+async function loadRecipient(tx: Tx, ctx: AccessContext, firmId: string, target: { leadId?: string; clientId?: string }): Promise<Recipient> {
   if (target.leadId) {
-    if (!isUuid(target.leadId)) throw new NotFoundError("Lead");
-    const [l] = await tx.select().from(leads).where(and(eq(leads.id, target.leadId), eq(leads.firmId, firmId), isNull(leads.deletedAt)));
-    if (!l) throw new NotFoundError("Lead");
+    const l = await loadVisibleLead(tx, ctx, firmId, target.leadId);
     if (!l.email) throw new ValidationError("This lead has no email address. Add one first.");
     return { email: l.email, name: [l.firstName, l.lastName].filter(Boolean).join(" "), firstName: l.firstName, reference: l.ref, leadId: l.id, clientId: null };
   }
   if (target.clientId) {
-    if (!isUuid(target.clientId)) throw new NotFoundError("Client");
-    const [c] = await tx.select().from(clients).where(and(eq(clients.id, target.clientId), eq(clients.firmId, firmId), isNull(clients.deletedAt)));
-    if (!c) throw new NotFoundError("Client");
+    const c = await loadVisibleClient(tx, ctx, firmId, target.clientId);
     if (!c.email) throw new ValidationError("This client has no email address. Add one first.");
     return { email: c.email, name: [c.firstName, c.lastName].filter(Boolean).join(" "), firstName: c.firstName, reference: c.ref, leadId: null, clientId: c.id };
   }
@@ -293,7 +291,7 @@ export async function sendToRecord(ctx: AccessContext, firmId: string, target: {
   const prepared = await withScope(ctx.scopeFor(firmId), async (tx) => {
     const mailbox = await mailboxFor(tx, ctx.orgId, where);
     if (!mailbox) throw new ValidationError("This firm has no sending mailbox yet. A Hub administrator can add one under Hub › Email settings.");
-    const recipient = await loadRecipient(tx, firmId, target);
+    const recipient = await loadRecipient(tx, ctx, firmId, target);
     const msg = await buildMessage(tx, ctx, where, recipient, input, mailbox);
     const [thread] = await tx
       .insert(emailThreads)
@@ -355,7 +353,7 @@ export async function replyToThread(ctx: AccessContext, where: EmailScope, threa
     return { thread, mailbox, message, msg, inReplyTo: last?.messageId ?? null };
   });
   const headers: Record<string, string> = {};
-  if (prepared.inReplyTo) {
+  if (prepared.inReplyTo && /^<[^\r\n<>\s]{3,250}>$/.test(prepared.inReplyTo)) {
     headers["In-Reply-To"] = prepared.inReplyTo;
     headers["References"] = prepared.inReplyTo;
   }
@@ -379,7 +377,7 @@ export async function previewForRecord(ctx: AccessContext, firmId: string, targe
   const input = parseOrThrow(composeSchema, raw);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
     const mailbox = (await mailboxFor(tx, ctx.orgId, where)) ?? { fromAddress: "not-set@example.invalid", fromName: "Not set", signature: null, inboundAddress: "", id: "" };
-    const recipient = await loadRecipient(tx, firmId, target);
+    const recipient = await loadRecipient(tx, ctx, firmId, target);
     const msg = await buildMessage(tx, ctx, where, recipient, input, mailbox as typeof mailboxes.$inferSelect);
     return { subject: msg.subject, html: msg.html, to: recipient.email, from: fromHeader(mailbox.fromName, mailbox.fromAddress) };
   });
@@ -388,6 +386,7 @@ export async function previewForRecord(ctx: AccessContext, firmId: string, targe
 /** Preview a template with sample values (template editor). */
 export async function previewTemplate(ctx: AccessContext, where: EmailScope, raw: unknown) {
   if (where.kind === "firm") ctx.requireAny(["templates:manage", "email:view"], where.firmId);
+  else if (!ctx.has("hub_templates:manage") && !ctx.has("intake:view")) throw new AccessDeniedError("hub_templates:manage");
   const input = parseOrThrow(templateSchema.partial({ name: true }), raw);
   return withScope(scopeOf(ctx, where), async (tx) => {
     const { brand, firmName } = await brandAndFirm(tx, where);
@@ -419,8 +418,9 @@ export async function listThreads(ctx: AccessContext, where: EmailScope, f: { q?
         id: emailThreads.id, subject: emailThreads.subject, counterpartEmail: emailThreads.counterpartEmail, counterpartName: emailThreads.counterpartName,
         unread: emailThreads.unread, status: emailThreads.status, lastMessageAt: emailThreads.lastMessageAt, leadId: emailThreads.leadId, clientId: emailThreads.clientId,
         intakeItemId: emailThreads.intakeItemId,
-        preview: sql<string | null>`(select left(m.text_body, 160) from email_messages m where m.thread_id = ${emailThreads.id} order by m.created_at desc limit 1)`,
-        lastDirection: sql<string | null>`(select m.direction::text from email_messages m where m.thread_id = ${emailThreads.id} order by m.created_at desc limit 1)`,
+        preview: sql<string | null>`(select left(m.text_body, 160) from email_messages m where m.thread_id = email_threads.id order by m.created_at desc limit 1)`,
+        unverified: sql<boolean>`exists (select 1 from email_messages m where m.thread_id = email_threads.id and m.direction = 'inbound' and m.auth_result like '%dmarc=fail%')`,
+        lastDirection: sql<string | null>`(select m.direction::text from email_messages m where m.thread_id = email_threads.id order by m.created_at desc limit 1)`,
       })
       .from(emailThreads)
       .where(and(...conds))
@@ -520,6 +520,9 @@ export async function ingestReceived(emailId: string, fetcher: (id: string) => P
   const scope: Scope = { orgId: ownerOrg, userId: null, firmIds: mailbox.firmId ? [mailbox.firmId] : [], intake: !mailbox.firmId };
   const subject = (mail.subject || "(no subject)").slice(0, 300);
   const inReplyTo = mail.headers?.["in-reply-to"] ?? mail.headers?.["In-Reply-To"] ?? null;
+  // A sender that fails authentication may be forged: never file it into an
+  // existing conversation or onto a client's record.
+  const untrusted = authFailed(mail.authentication);
 
   return withScope(scope, async (tx) => {
     const [dup] = await tx.select({ id: emailMessages.id }).from(emailMessages).where(eq(emailMessages.providerId, mail.id));
@@ -527,14 +530,16 @@ export async function ingestReceived(emailId: string, fetcher: (id: string) => P
 
     // 1. The thread tag in the reply-to address, 2. In-Reply-To of one of ours, 3. same sender + subject in 60 days.
     let thread: typeof emailThreads.$inferSelect | undefined;
-    if (taggedThread) {
+    if (untrusted) {
+      // fall through: new, unlinked conversation
+    } else if (taggedThread) {
       [thread] = await tx.select().from(emailThreads).where(and(eq(emailThreads.id, taggedThread), firmCond(emailThreads.firmId, where)));
     }
-    if (!thread && inReplyTo) {
+    if (!thread && !untrusted && inReplyTo) {
       const [m] = await tx.select({ threadId: emailMessages.threadId }).from(emailMessages).where(and(eq(emailMessages.messageId, inReplyTo))).limit(1);
       if (m) [thread] = await tx.select().from(emailThreads).where(and(eq(emailThreads.id, m.threadId), firmCond(emailThreads.firmId, where)));
     }
-    if (!thread) {
+    if (!thread && !untrusted) {
       const base = subject.replace(/^(re|fw|fwd)\s*:\s*/gi, "").trim();
       [thread] = await tx
         .select()
@@ -549,19 +554,21 @@ export async function ingestReceived(emailId: string, fetcher: (id: string) => P
       let leadId: string | null = null;
       let clientId: string | null = null;
       let intakeItemId: string | null = null;
-      if (mailbox!.firmId) {
+      if (untrusted) {
+        // unlinked; shown with a warning
+      } else if (mailbox!.firmId) {
         const [c] = await tx.select({ id: clients.id }).from(clients).where(and(eq(clients.firmId, mailbox!.firmId), eq(clients.email, from.email), isNull(clients.deletedAt))).limit(1);
         if (c) clientId = c.id;
         else {
           const [l] = await tx.select({ id: leads.id }).from(leads).where(and(eq(leads.firmId, mailbox!.firmId), eq(leads.email, from.email), isNull(leads.deletedAt))).orderBy(desc(leads.createdAt)).limit(1);
           if (l) leadId = l.id;
         }
-      } else if (!authFailed(mail.authentication)) {
+      } else {
         const name = (from.name ?? from.email.split("@")[0]).trim();
         const [firstName, ...rest] = name.split(/\s+/);
         const { item } = await storeIntake(tx, ownerOrg, {
           firstName: (firstName || "Unknown").slice(0, 80), lastName: rest.join(" ").slice(0, 80), email: from.email, phone: "",
-          enquiry: `${subject}\n\n${(mail.text ?? "").slice(0, 4500)}`.trim(), source: "email", sourceRef: `email:${mail.id}`, consentContact: true,
+          enquiry: `${subject}\n\n${(mail.text ?? "").slice(0, 4500)}`.trim(), source: "email", sourceRef: `email:${mail.id}`, consentContact: false,
         }, null);
         intakeItemId = item.id;
       }
@@ -581,7 +588,7 @@ export async function ingestReceived(emailId: string, fetcher: (id: string) => P
       attachments: (mail.attachments ?? []).slice(0, 30).map((a) => ({ id: a.id, filename: a.filename, contentType: a.content_type, size: a.size ?? null })),
       authResult: authLabel(mail.authentication),
     });
-    if (thread.firmId && (thread.leadId || thread.clientId)) {
+    if (!untrusted && thread.firmId && (thread.leadId || thread.clientId)) {
       await tx.insert(activities).values({ firmId: thread.firmId, leadId: thread.leadId, clientId: thread.clientId, type: "email", body: subject, data: { threadId: thread.id, direction: "inbound" } });
     }
     await audit({ orgId: ownerOrg, actorId: null, firmId: mailbox!.firmId, action: "email.received", entityType: "email_thread", entityId: thread.id, summary: `Email received at ${mailbox!.label}` }, tx);

@@ -46,3 +46,7 @@ A separate reviewer, who had not seen the work being built, examined the code an
 | L9 Webhook replays without a sender id duplicated enquiries | Low | **Fixed.** The signature serves as the id. Test added |
 | L10 CSP allows inline scripts | Low | **Open**, known limitation L8 |
 | Informational: org audit log shows summaries for firms not sharing metrics; some same-firm references enforced only in the app; group invitation replaces an existing group role | Info | Recorded in the known-limitations register |
+
+## 23 Oct 2026: Hub branding, email, proposals
+- 74 unit and integration tests pass; 7 end-to-end tests with accessibility checks pass; production build passes.
+- Independent security review of the new code: no High findings. Fixed: forged email could be filed into a client's conversation (M1); proposals and email ignored assigned-only lead visibility (M2); Hub template preview lacked a permission check (L1); Hub email rows not tied to their thread's firm in the database (L2, trigger); formatted received email could load remote images (L3, frame CSP); withdrawn proposals couldn't be re-sent; oversized amounts; unchecked service id; In-Reply-To header format; reserved firm slugs. Also found and fixed during testing: two correlated subqueries that compared the wrong id column (inbox previews, catalogue version numbers). Each has a regression test.

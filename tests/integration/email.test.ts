@@ -124,4 +124,33 @@ describe("email", () => {
     // Message content can't be rewritten by the app.
     await expect(withScope({ orgId: vAdmin.orgId, userId: null, firmIds: [veritas] }, (tx) => tx.execute(sql`update email_messages set text_body = 'x'`))).rejects.toThrow();
   });
+
+  it("never files a forged sender into a client's conversation or record (review M1)", async () => {
+    const veritas = await firmId("veritas");
+    const admin = await makeUser({ firms: { veritas: "firm_admin" } });
+    const { lead: l } = await createLead(admin, veritas, lead({ email: "client@test.example" }));
+    const { threadId } = await sendToRecord(admin, veritas, { leadId: l.id }, { subject: "Your proposal", body: "Attached." });
+    const forged = await ingestReceived("x", fetchOf(received({ from: "client@test.example", subject: "Re: Your proposal", to: [threadReplyAddress("veritas@in.thegih.com", threadId)], authentication: { spf: "fail", dkim: "fail", dmarc: "fail" } })));
+    if (forged.status !== "stored") throw new Error("not stored");
+    expect(forged.threadId).not.toBe(threadId);
+    const t = await getThread(admin, { kind: "firm", firmId: veritas }, forged.threadId);
+    expect(t.thread.leadId).toBeNull();
+    const acts = await owner.select().from(s.activities).where(eq(s.activities.leadId, l.id));
+    expect(acts.filter((a) => a.type === "email" && a.data.direction === "inbound")).toHaveLength(0);
+    const listed = (await listThreads(admin, { kind: "firm", firmId: veritas })).find((x) => x.id === forged.threadId);
+    expect(listed?.unverified).toBe(true);
+  });
+
+  it("only emails records the sender can see, and keeps Hub rows off firm conversations (review M2, L2)", async () => {
+    const veritas = await firmId("veritas");
+    const admin = await makeUser({ firms: { veritas: "firm_admin" } });
+    const { lead: other } = await createLead(admin, veritas, lead({ email: "other@test.example" }));
+    const limited = await makeUser({ firms: { veritas: "support_officer" } });
+    const custom = Object.assign(Object.create(Object.getPrototypeOf(limited)), limited);
+    custom.has = (p: string, f?: string) => p === "email:send" || limited.has(p as never, f as never);
+    custom.require = (p: string, f?: string) => { if (!custom.has(p, f)) throw new AccessDeniedError(p); };
+    await expect(sendToRecord(custom, veritas, { leadId: other.id }, { subject: "Hi", body: "x" })).rejects.toBeInstanceOf(NotFoundError);
+    const { threadId } = await sendToRecord(admin, veritas, { leadId: other.id }, { subject: "Hi", body: "x" });
+    await expect(owner.execute(sql`insert into email_messages (org_id, firm_id, thread_id, direction, status, from_address, subject) select org_id, null, id, 'inbound', 'received', 'x@y.z', 'x' from email_threads where id = ${threadId}`)).rejects.toMatchObject({ cause: { message: expect.stringMatching(/does not match/) } });
+  });
 });

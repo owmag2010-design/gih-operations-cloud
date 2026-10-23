@@ -11,8 +11,13 @@ import { Button, Field, Input, Notice, Select, Textarea } from "@/components/ui/
 export type TemplateOption = { id: string; name: string; category: string; subject: string; hub: boolean };
 
 /** Sandboxed preview of an email's HTML: no scripts, no same-origin, no remote images (CSP). */
-export function EmailFrame({ html, title, height = 520 }: { html: string; title: string; height?: number }) {
-  return <iframe title={title} sandbox="" srcDoc={html} className="w-full rounded-md border border-hairline bg-white" style={{ height }} />;
+/** Inside the frame nothing may load from the internet (tracking pixels, remote CSS): only inline and embedded content. */
+const FRAME_CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'; font-src data:">`;
+
+export function EmailFrame({ html, title, height = 520, allowSameSiteImages = false }: { html: string; title: string; height?: number; allowSameSiteImages?: boolean }) {
+  const csp = allowSameSiteImages ? FRAME_CSP.replace("img-src data: cid:", "img-src data: cid: https: http:") : FRAME_CSP;
+  const doc = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => `${m}${csp}`) : `${csp}${html}`;
+  return <iframe title={title} sandbox="" srcDoc={doc} className="w-full rounded-md border border-hairline bg-white" style={{ height }} />;
 }
 
 function TemplateSelect({ templates, value, onChange }: { templates: TemplateOption[]; value: string; onChange: (v: string) => void }) {
@@ -69,7 +74,7 @@ export function ComposeDialog({ firmSlug, target, to, templates, disabled }: { f
           {preview ? (
             <div className="flex flex-col gap-2">
               <p className="text-xs text-muted">From {preview.from} · Subject: <span className="text-ink">{preview.subject}</span></p>
-              <EmailFrame html={preview.html} title="Email preview" height={420} />
+              <EmailFrame html={preview.html} title="Email preview" height={420} allowSameSiteImages />
             </div>
           ) : null}
           <div className="flex flex-wrap gap-2">

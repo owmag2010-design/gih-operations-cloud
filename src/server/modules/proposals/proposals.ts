@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AccessContext } from "../../access/context";
 import { audit } from "../../audit";
@@ -24,6 +24,7 @@ import { optionalEmail, parseOrThrow } from "../../validation";
 import { countryName } from "@/lib/countries";
 import { nextRef } from "../refs";
 import { parseMoney } from "../services/services";
+import { leadVisibility, loadVisibleLead } from "../crm/leads";
 import { defaultSections } from "./templates";
 
 export type ProposalStatus = (typeof proposals.$inferSelect)["status"];
@@ -37,12 +38,18 @@ const assertUuid = (id: string, what: string) => {
   if (!uuid.safeParse(id).success) throw new NotFoundError(what);
 };
 
-async function load(tx: Tx, firmId: string, id: string, lock = false) {
+/** Load a proposal whose lead the caller can see (assigned-only roles see only their leads' proposals). */
+async function load(tx: Tx, ctx: AccessContext, firmId: string, id: string, lock = false) {
   assertUuid(id, "Proposal");
-  const q = tx.select().from(proposals).where(and(eq(proposals.id, id), eq(proposals.firmId, firmId))).limit(1);
-  const [row] = lock ? await q.for("update") : await q;
+  const q = tx
+    .select({ p: proposals })
+    .from(proposals)
+    .innerJoin(leads, eq(leads.id, proposals.leadId))
+    .where(and(eq(proposals.id, id), eq(proposals.firmId, firmId), ...leadVisibility(ctx, firmId)))
+    .limit(1);
+  const [row] = lock ? await q.for("update", { of: proposals }) : await q;
   if (!row) throw new NotFoundError("Proposal");
-  return row;
+  return row.p;
 }
 
 function assertStatus(p: { status: ProposalStatus }, allowed: ProposalStatus[], action: string) {
@@ -93,7 +100,7 @@ async function addServiceItem(tx: Tx, firmId: string, proposalId: string, servic
 
 export async function listProposals(ctx: AccessContext, firmId: string, f: { status?: string; leadId?: string } = {}) {
   ctx.require("proposals:view", firmId);
-  const conds = [eq(proposals.firmId, firmId)];
+  const conds = [eq(proposals.firmId, firmId), ...leadVisibility(ctx, firmId)];
   if (f.status === "open") conds.push(inArray(proposals.status, OPEN_STATUSES));
   else if (f.status && f.status in { draft: 1, in_review: 1, changes_requested: 1, approved: 1, released: 1, accepted: 1, declined: 1, withdrawn: 1 }) conds.push(eq(proposals.status, f.status as ProposalStatus));
   if (f.leadId && uuid.safeParse(f.leadId).success) conds.push(eq(proposals.leadId, f.leadId));
@@ -110,7 +117,12 @@ export async function listProposals(ctx: AccessContext, firmId: string, f: { sta
       .where(and(...conds))
       .orderBy(desc(proposals.updatedAt))
       .limit(200);
-    const counts = await tx.select({ status: proposals.status, n: count() }).from(proposals).where(eq(proposals.firmId, firmId)).groupBy(proposals.status);
+    const counts = await tx
+      .select({ status: proposals.status, n: count() })
+      .from(proposals)
+      .innerJoin(leads, eq(leads.id, proposals.leadId))
+      .where(and(eq(proposals.firmId, firmId), ...leadVisibility(ctx, firmId)))
+      .groupBy(proposals.status);
     return { rows, counts: Object.fromEntries(counts.map((c) => [c.status, c.n])) as Partial<Record<ProposalStatus, number>> };
   });
 }
@@ -118,7 +130,7 @@ export async function listProposals(ctx: AccessContext, firmId: string, f: { sta
 export async function getProposal(ctx: AccessContext, firmId: string, id: string) {
   ctx.require("proposals:view", firmId);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const proposal = await load(tx, firmId, id);
+    const proposal = await load(tx, ctx, firmId, id);
     const items = await tx.select().from(proposalItems).where(eq(proposalItems.proposalId, proposal.id)).orderBy(asc(proposalItems.position));
     const [lead] = await tx
       .select({ id: leads.id, ref: leads.ref, firstName: leads.firstName, lastName: leads.lastName, email: leads.email, enquiry: leads.enquiry, convertedClientId: leads.convertedClientId })
@@ -145,7 +157,7 @@ export async function getProposal(ctx: AccessContext, firmId: string, id: string
 export async function getProposalSnapshot(ctx: AccessContext, firmId: string, id: string, version?: number) {
   ctx.require("proposals:view", firmId);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id);
+    const p = await load(tx, ctx, firmId, id);
     const [v] = await tx
       .select({ snapshot: proposalVersions.snapshot })
       .from(proposalVersions)
@@ -157,7 +169,7 @@ export async function getProposalSnapshot(ctx: AccessContext, firmId: string, id
 /** A preview snapshot of the current draft (not stored). */
 export async function previewSnapshot(ctx: AccessContext, firmId: string, id: string): Promise<ProposalSnapshot> {
   ctx.require("proposals:view", firmId);
-  return withScope(ctx.scopeFor(firmId), async (tx) => buildSnapshot(tx, await load(tx, firmId, id), new Date()));
+  return withScope(ctx.scopeFor(firmId), async (tx) => buildSnapshot(tx, await load(tx, ctx, firmId, id), new Date()));
 }
 
 async function buildSnapshot(tx: Tx, p: typeof proposals.$inferSelect, releasedAt: Date): Promise<ProposalSnapshot> {
@@ -188,8 +200,7 @@ export async function createProposalFromLead(ctx: AccessContext, firmId: string,
   ctx.require("proposals:create", firmId);
   assertUuid(leadId, "Lead");
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const [lead] = await tx.select().from(leads).where(and(eq(leads.id, leadId), eq(leads.firmId, firmId), isNull(leads.deletedAt)));
-    if (!lead) throw new NotFoundError("Lead");
+    const lead = await loadVisibleLead(tx, ctx, firmId, leadId);
     const firm = ctx.firm(firmId);
     const [firmRow] = await tx.select({ slug: firms.slug, tradingName: firms.tradingName }).from(firms).where(eq(firms.id, firmId));
     const ref = await nextRef(tx, firmId, firm.refPrefix, "proposal");
@@ -250,7 +261,7 @@ export async function updateProposal(ctx: AccessContext, firmId: string, id: str
     keys.add(s.key);
   }
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, EDITABLE, "edited");
     const [updated] = await tx
       .update(proposals)
@@ -272,7 +283,7 @@ const itemSchema = z.object({
 export async function addProposalItem(ctx: AccessContext, firmId: string, id: string, raw: { serviceId?: string } | Record<string, unknown>) {
   ctx.require("proposals:edit", firmId);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, EDITABLE, "edited");
     const [{ n }] = await tx.select({ n: count() }).from(proposalItems).where(eq(proposalItems.proposalId, p.id));
     if (n >= 20) throw new ValidationError("A proposal can have up to 20 items.");
@@ -304,7 +315,7 @@ export async function updateProposalItem(ctx: AccessContext, firmId: string, id:
   if (unit === null) throw new ValidationError("Check the amount.", { unit: "Enter an amount, for example 2500." });
   if (deposit === null || deposit > unit) throw new ValidationError("Check the deposit.", { deposit: "The deposit must be an amount no more than the price." });
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, EDITABLE, "edited");
     const [item] = await tx.select().from(proposalItems).where(and(eq(proposalItems.id, itemId), eq(proposalItems.proposalId, p.id)));
     if (!item) throw new NotFoundError("Item");
@@ -323,7 +334,7 @@ export async function removeProposalItem(ctx: AccessContext, firmId: string, id:
   ctx.require("proposals:edit", firmId);
   assertUuid(itemId, "Item");
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, EDITABLE, "edited");
     await tx.delete(proposalItems).where(and(eq(proposalItems.id, itemId), eq(proposalItems.proposalId, p.id)));
     await recompute(tx, p.id);
@@ -335,7 +346,7 @@ export async function removeProposalItem(ctx: AccessContext, firmId: string, id:
 export async function submitForReview(ctx: AccessContext, firmId: string, id: string) {
   ctx.require("proposals:edit", firmId);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, EDITABLE, "sent for review");
     const [{ n }] = await tx.select({ n: count() }).from(proposalItems).where(eq(proposalItems.proposalId, p.id));
     if (n === 0) throw new ValidationError("Add at least one fee item before sending for review.");
@@ -351,7 +362,7 @@ export async function requestChanges(ctx: AccessContext, firmId: string, id: str
   const clean = note.trim().slice(0, 1000);
   if (clean.length < 3) throw new ValidationError("Say what needs to change.", { note: "Say what needs to change." });
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, ["in_review", "approved"], "sent back");
     await tx.update(proposals).set({ status: "changes_requested", reviewNote: clean, approvedAt: null, approvedById: null, updatedAt: new Date() }).where(eq(proposals.id, p.id));
     await logActivity(tx, ctx, p, "changes_requested", `Changes requested on ${p.ref}`);
@@ -362,7 +373,7 @@ export async function requestChanges(ctx: AccessContext, firmId: string, id: str
 export async function approveProposal(ctx: AccessContext, firmId: string, id: string) {
   ctx.require("proposals:approve", firmId);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, ["in_review"], "approved");
     await tx.update(proposals).set({ status: "approved", approvedById: ctx.user.id, approvedAt: new Date(), updatedAt: new Date() }).where(eq(proposals.id, p.id));
     await logActivity(tx, ctx, p, "approved", `Approved ${p.ref}`);
@@ -382,9 +393,11 @@ function newLink() {
 export async function releaseProposal(ctx: AccessContext, firmId: string, id: string) {
   ctx.require("proposals:release", firmId);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, ["approved"], "sent");
     const now = new Date();
+    const [already] = await tx.select({ v: proposalVersions.version }).from(proposalVersions).where(and(eq(proposalVersions.proposalId, p.id), eq(proposalVersions.version, p.version)));
+    if (already) throw new ConflictError("This version was already sent. Start a new version first.");
     const snapshot = await buildSnapshot(tx, p, now);
     const link = newLink();
     await tx.insert(proposalVersions).values({ firmId, proposalId: p.id, version: p.version, snapshot, createdById: ctx.user.id });
@@ -402,7 +415,7 @@ export async function releaseProposal(ctx: AccessContext, firmId: string, id: st
 export async function renewLink(ctx: AccessContext, firmId: string, id: string, extendDays?: number) {
   ctx.require("proposals:release", firmId);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, ["released"], "given a new link");
     const link = newLink();
     const days = extendDays && extendDays > 0 ? Math.min(extendDays, 90) : 0;
@@ -416,7 +429,7 @@ export async function renewLink(ctx: AccessContext, firmId: string, id: string, 
 export async function withdrawProposal(ctx: AccessContext, firmId: string, id: string) {
   ctx.require("proposals:release", firmId);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, ["draft", "in_review", "changes_requested", "approved", "released"], "withdrawn");
     await tx.update(proposals).set({ status: "withdrawn", linkTokenHash: null, updatedAt: new Date() }).where(eq(proposals.id, p.id));
     await logActivity(tx, ctx, p, "withdrawn", `Withdrew ${p.ref}`);
@@ -428,9 +441,10 @@ export async function withdrawProposal(ctx: AccessContext, firmId: string, id: s
 export async function reviseProposal(ctx: AccessContext, firmId: string, id: string) {
   ctx.require("proposals:edit", firmId);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const p = await load(tx, firmId, id, true);
+    const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, ["released", "declined", "withdrawn", "approved", "in_review"], "revised");
-    const bump = ["released", "declined"].includes(p.status) ? 1 : 0;
+    const [sent] = await tx.select({ v: proposalVersions.version }).from(proposalVersions).where(and(eq(proposalVersions.proposalId, p.id), eq(proposalVersions.version, p.version)));
+    const bump = sent ? 1 : 0; // a version the client has seen is never edited in place
     await tx
       .update(proposals)
       .set({

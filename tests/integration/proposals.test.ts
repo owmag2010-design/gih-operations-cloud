@@ -10,6 +10,7 @@ import {
   listProposals,
   releaseProposal,
   removeProposalItem,
+  withdrawProposal,
   renewLink,
   requestChanges,
   respondToProposal,
@@ -62,6 +63,7 @@ describe("services and fees", () => {
     expect(service.totalMinor).toBe(1_855_000);
     expect(history.map((h) => h.version)).toEqual([2, 1]);
     expect(history[1].totalMinor).toBe(svc.totalMinor);
+    expect((await listCatalogue(admin, veritas)).find((c) => c.id === svc.id)?.version).toBe(2);
     expect(await auditCount("service.updated")).toBe(1);
   });
 
@@ -188,5 +190,31 @@ describe("proposals", () => {
     expect(seen.rows).toHaveLength(0);
     const items = await withScope({ orgId: admin.orgId, userId: null, firmIds: [mimshac] }, (tx) => tx.execute(sql`select id from proposal_items`));
     expect(items.rows).toHaveLength(0);
+  });
+
+  it("can send again after a withdrawal, as a new version (review)", async () => {
+    const { veritas, admin, lead: l, catalogue } = await setup();
+    const p = await createProposalFromLead(admin, veritas, l.id, { serviceIds: [catalogue[0].id] });
+    await submitForReview(admin, veritas, p.id);
+    await approveProposal(admin, veritas, p.id);
+    await releaseProposal(admin, veritas, p.id);
+    await withdrawProposal(admin, veritas, p.id);
+    await reviseProposal(admin, veritas, p.id);
+    expect((await getProposal(admin, veritas, p.id)).proposal.version).toBe(2);
+    await submitForReview(admin, veritas, p.id);
+    await approveProposal(admin, veritas, p.id);
+    await expect(releaseProposal(admin, veritas, p.id)).resolves.toHaveProperty("url");
+  });
+
+  it("hides proposals for leads an assigned-only user can't see (review M2)", async () => {
+    const { veritas, admin, lead: l, catalogue } = await setup();
+    await createProposalFromLead(admin, veritas, l.id, { serviceIds: [catalogue[0].id] });
+    const finance = await makeUser({ firms: { veritas: "finance_officer" } });
+    await expect(listProposals(finance, veritas)).rejects.toBeInstanceOf(AccessDeniedError);
+  });
+
+  it("rejects amounts too large to store", async () => {
+    expect(parseMoney("99999999")).toBeNull();
+    expect(parseMoney("10000000")).toBe(1_000_000_000);
   });
 });

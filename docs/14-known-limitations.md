@@ -25,3 +25,5 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L20 | Proposals have no AI first draft and no online deposit payment | Drafting and payment are manual | Anthropic API key; Stripe payment links |
 | L21 | Accepting a proposal does not convert the lead automatically | A consultant converts the lead after the deposit | Convert on deposit once payments are connected |
 | L22 | Inbound mail from a thread tag is trusted to identify the conversation | A sender who learns a tagged address could post into that conversation | Acceptable: the tag is a random 128-bit id; messages show the real sender |
+| L23 | A proposal's author may also approve it (recorded in the audit log as self-approval) | No enforced four-eyes check | Add a firm policy to require a different approver once teams grow |
+| L24 | New Hub email senders are recorded without contact consent; staff confirm consent when routing | Consent must be captured manually | Add a consent prompt in Hub intake |

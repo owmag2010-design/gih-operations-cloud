@@ -80,7 +80,7 @@ export async function updateFirmPolicies(ctx: AccessContext, firmId: string, raw
 }
 
 const createFirmSchema = profileSchema.extend({
-  slug: z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9-]{1,30}$/, "Use 2–31 lowercase letters, numbers or hyphens."),
+  slug: z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9-]{1,30}$/, "Use 2–31 lowercase letters, numbers or hyphens.").refine((v) => !["hub", "hq", "p", "api"].includes(v), "That name is reserved."),
   refPrefix: z.string().trim().toUpperCase().regex(/^[A-Z]{2,4}$/, "Use 2–4 letters."),
 });
 

@@ -34,7 +34,7 @@ function visibility(ctx: AccessContext, firmId: string): SQL[] {
   return c;
 }
 
-async function loadVisible(tx: Tx, ctx: AccessContext, firmId: string, id: string, lock = false) {
+export async function loadVisibleClient(tx: Tx, ctx: AccessContext, firmId: string, id: string, lock = false) {
   if (!z.string().uuid().safeParse(id).success) throw new NotFoundError("Client");
   const q = tx.select().from(clients).where(and(eq(clients.id, id), ...visibility(ctx, firmId))).limit(1);
   const [row] = lock ? await q.for("update") : await q;
@@ -81,7 +81,7 @@ export async function listClients(ctx: AccessContext, firmId: string, f: ClientF
 
 export async function getClient(ctx: AccessContext, firmId: string, id: string) {
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const client = await loadVisible(tx, ctx, firmId, id);
+    const client = await loadVisibleClient(tx, ctx, firmId, id);
     const consultant = client.primaryConsultantId
       ? (await tx.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.id, client.primaryConsultantId)))[0] ?? null
       : null;
@@ -124,7 +124,7 @@ export async function updateClient(ctx: AccessContext, firmId: string, id: strin
   ctx.require("clients:edit", firmId);
   const input = parseOrThrow(clientSchema, raw);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const before = await loadVisible(tx, ctx, firmId, id, true);
+    const before = await loadVisibleClient(tx, ctx, firmId, id, true);
     await assertConsultant(tx, firmId, input.primaryConsultantId);
     const [client] = await tx
       .update(clients)
@@ -146,7 +146,7 @@ export async function addClientNote(ctx: AccessContext, firmId: string, id: stri
   const text = body.trim();
   if (!text || text.length > 5000) throw new ValidationError("Write a note of up to 5,000 characters.", { body: "Required." });
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const client = await loadVisible(tx, ctx, firmId, id);
+    const client = await loadVisibleClient(tx, ctx, firmId, id);
     await tx.insert(activities).values({ firmId, clientId: client.id, type: "note", body: text, actorId: ctx.user.id });
   });
 }

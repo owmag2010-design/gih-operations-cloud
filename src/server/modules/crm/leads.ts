@@ -66,16 +66,16 @@ function viewMode(ctx: AccessContext, firmId: string): "all" | "assigned" {
   throw new AccessDeniedError("leads:view");
 }
 
-function visibility(ctx: AccessContext, firmId: string): SQL[] {
+export function leadVisibility(ctx: AccessContext, firmId: string): SQL[] {
   const conds: SQL[] = [eq(leads.firmId, firmId), isNull(leads.deletedAt)];
   if (viewMode(ctx, firmId) === "assigned") conds.push(eq(leads.assignedToId, ctx.user.id));
   return conds;
 }
 
 /** Load one visible lead or throw NotFound (also when it exists but is out of scope). */
-async function loadVisibleLead(tx: Tx, ctx: AccessContext, firmId: string, leadId: string, lock = false) {
+export async function loadVisibleLead(tx: Tx, ctx: AccessContext, firmId: string, leadId: string, lock = false) {
   if (!z.string().uuid().safeParse(leadId).success) throw new NotFoundError("Lead");
-  const q = tx.select().from(leads).where(and(eq(leads.id, leadId), ...visibility(ctx, firmId))).limit(1);
+  const q = tx.select().from(leads).where(and(eq(leads.id, leadId), ...leadVisibility(ctx, firmId))).limit(1);
   const [row] = lock ? await q.for("update") : await q;
   if (!row) throw new NotFoundError("Lead");
   return row;
@@ -139,7 +139,7 @@ async function defaultStage(tx: Tx, firmId: string) {
 const PAGE_SIZE = 50;
 
 function filterConditions(ctx: AccessContext, firmId: string, f: LeadFilters): SQL[] {
-  const conds = visibility(ctx, firmId);
+  const conds = leadVisibility(ctx, firmId);
   if (f.q) {
     const term = `%${f.q.trim().replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
     conds.push(
@@ -263,7 +263,7 @@ async function findDuplicates(tx: Tx, ctx: AccessContext, firmId: string, p: { e
   return tx
     .select({ id: leads.id, ref: leads.ref, firstName: leads.firstName, lastName: leads.lastName, createdAt: leads.createdAt })
     .from(leads)
-    .where(and(...visibility(ctx, firmId), or(...match), p.excludeId ? ne(leads.id, p.excludeId) : undefined))
+    .where(and(...leadVisibility(ctx, firmId), or(...match), p.excludeId ? ne(leads.id, p.excludeId) : undefined))
     .orderBy(desc(leads.createdAt))
     .limit(10);
 }
