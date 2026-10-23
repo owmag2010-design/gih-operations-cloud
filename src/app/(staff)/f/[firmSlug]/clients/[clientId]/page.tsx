@@ -7,6 +7,8 @@ import { countryName } from "@/lib/countries";
 import { fullName } from "@/lib/labels";
 import { NotFoundError } from "@/server/errors";
 import { getClient } from "@/server/modules/clients/clients";
+import { listTemplates } from "@/server/modules/email/mail";
+import { ComposeDialog } from "@/components/email/client";
 import { requireFirm } from "@/server/next/session";
 import { Timeline } from "../../timeline";
 import { ClientNoteForm } from "./note-form";
@@ -24,6 +26,8 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/f
   const canEdit = ctx.has("clients:edit", firm.firmId);
   const base = `/f/${firm.slug}`;
   const canSeeLead = ctx.has("leads:view_all", firm.firmId);
+  const canEmail = ctx.has("email:send", firm.firmId);
+  const templates = canEmail ? (await listTemplates(ctx, { kind: "firm", firmId: firm.firmId }, { includeHub: true, activeOnly: true })).map((t) => ({ id: t.id, name: t.name, category: t.category, subject: t.subject, hub: t.firmId === null })) : [];
 
   return (
     <>
@@ -33,7 +37,12 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/f
       <PageHeader
         title={fullName(client.firstName, client.lastName)}
         meta={<Badge tone={client.status === "active" ? "ok" : "neutral"} className="capitalize">{client.status}</Badge>}
-        actions={canEdit ? <Button asChild><Link href={`${base}/clients/${client.id}/edit`}>Edit</Link></Button> : null}
+        actions={
+          <>
+            {canEmail ? <ComposeDialog firmSlug={firm.slug} target={{ clientId: client.id }} to={client.email} templates={templates} /> : null}
+            {canEdit ? <Button asChild><Link href={`${base}/clients/${client.id}/edit`}>Edit</Link></Button> : null}
+          </>
+        }
       />
       {sp.converted ? <Notice tone="ok" className="mb-4">Converted to client {client.ref}. The lead now shows as Converted.</Notice> : null}
       <div className="grid gap-5 lg:grid-cols-[1fr_360px]">

@@ -392,11 +392,12 @@ export async function previewTemplate(ctx: AccessContext, where: EmailScope, raw
   return withScope(scopeOf(ctx, where), async (tx) => {
     const { brand, firmName } = await brandAndFirm(tx, where);
     const mailbox = await mailboxFor(tx, ctx.orgId, where);
+    const sampleRef = where.kind === "hub" ? "GIH-000123" : `${ctx.firm(where.firmId).refPrefix}-L-000123`;
     return renderEmail({
       brand, subject: input.subject, preheader: input.preheader, blocks: input.blocks,
       signature: mailbox?.signature ?? `${ctx.user.name}\n${firmName}`,
-      values: { first_name: "Thandi", full_name: "Thandi Ndlovu", email: "thandi@example.com", reference: "VE-L-000123", firm_name: firmName, sender_name: ctx.user.name, sender_email: mailbox?.fromAddress ?? "hello@thegih.com", today: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) },
-      reference: "VE-L-000123",
+      values: { first_name: "Thandi", full_name: "Thandi Ndlovu", email: "thandi@example.com", reference: sampleRef, firm_name: firmName, sender_name: ctx.user.name, sender_email: mailbox?.fromAddress ?? "hello@thegih.com", today: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) },
+      reference: sampleRef,
     });
   });
 }

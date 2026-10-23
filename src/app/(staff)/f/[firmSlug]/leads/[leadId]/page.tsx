@@ -7,6 +7,13 @@ import { countryName } from "@/lib/countries";
 import { fullName, PRIORITY_LABELS, PRIORITY_TONE, SOURCE_LABELS, STAGE_TONE } from "@/lib/labels";
 import { NotFoundError } from "@/server/errors";
 import { getLead, listStages } from "@/server/modules/crm/leads";
+import { listTemplates } from "@/server/modules/email/mail";
+import { ComposeDialog } from "@/components/email/client";
+import { listProposals, statusLabel } from "@/server/modules/proposals/proposals";
+import { listCatalogue } from "@/server/modules/services/services";
+import { formatMoney } from "@/lib/labels";
+import { CreateProposalDialog } from "../../proposals/client";
+import { PROPOSAL_TONE } from "../../proposals/labels";
 import { requireFirm } from "@/server/next/session";
 import { Timeline } from "../../timeline";
 import { ConsentDialog, ConvertButton, DuplicateList, NoteForm, StageSelect } from "./client";
@@ -27,6 +34,12 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/f/[
   const canConvert = ctx.has("leads:convert", firm.firmId) && ctx.has("clients:create", firm.firmId);
   const base = `/f/${firm.slug}`;
   const contactConsent = consents.find((c) => c.purpose === "contact");
+  const canEmail = ctx.has("email:send", firm.firmId);
+  const canPropose = ctx.has("proposals:create", firm.firmId) && !client;
+  const canSeeProposals = ctx.has("proposals:view", firm.firmId);
+  const proposals = canSeeProposals ? (await listProposals(ctx, firm.firmId, { leadId: lead.id })).rows : [];
+  const catalogue = canPropose ? (await listCatalogue(ctx, firm.firmId, { activeOnly: true })).map((x) => ({ id: x.id, name: x.name, category: x.category, total: formatMoney(x.totalMinor, x.currency) })) : [];
+  const templates = canEmail ? (await listTemplates(ctx, { kind: "firm", firmId: firm.firmId }, { includeHub: true, activeOnly: true })).map((t) => ({ id: t.id, name: t.name, category: t.category, subject: t.subject, hub: t.firmId === null })) : [];
 
   return (
     <>
@@ -44,6 +57,8 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/f/[
         }
         actions={
           <>
+            {canEmail ? <ComposeDialog firmSlug={firm.slug} target={{ leadId: lead.id }} to={lead.email} templates={templates} /> : null}
+            {canPropose ? <CreateProposalDialog firmSlug={firm.slug} leadId={lead.id} services={catalogue} /> : null}
             {canEdit && !client ? <StageSelect firmSlug={firm.slug} leadId={lead.id} current={lead.stageId} stages={stages.filter((s) => s.category !== "won").map((s) => ({ id: s.id, name: s.name }))} /> : null}
             {canEdit ? <Button asChild><Link href={`${base}/leads/${lead.id}/edit`}>Edit</Link></Button> : null}
             {client ? (
@@ -65,6 +80,19 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/f/[
               {lead.enquiry ? <p className="max-w-[75ch] text-sm leading-relaxed whitespace-pre-wrap text-ink">{lead.enquiry}</p> : <p className="text-[13px] text-muted">No enquiry text was recorded.</p>}
             </div>
           </Panel>
+          {canSeeProposals && proposals.length ? (
+            <Panel>
+              <PanelHeader title="Proposals" />
+              <ul className="divide-y divide-hairline">
+                {proposals.map((pr) => (
+                  <li key={pr.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-[13px]">
+                    <Link href={`${base}/proposals/${pr.id}`} className="text-ink underline-offset-2 hover:underline">{pr.title} <span className="num text-xs text-muted">{pr.ref} v{pr.version}</span></Link>
+                    <span className="flex items-center gap-2"><span className="num text-ink-2">{formatMoney(pr.totalMinor, pr.currency)}</span><Badge tone={PROPOSAL_TONE[pr.status]}>{statusLabel(pr.status)}</Badge></span>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          ) : null}
           <Panel>
             <PanelHeader title="Activity" description="Internal: never shown to the client." />
             {canEdit ? <div className="border-b border-hairline p-4"><NoteForm firmSlug={firm.slug} leadId={lead.id} /></div> : null}

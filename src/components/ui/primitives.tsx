@@ -61,8 +61,8 @@ export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLab
 }
 
 /** Label, control, hint and error, wired for screen readers. */
-export function Field({ label, name, hint, error, children, className }: { label: string; name: string; hint?: string; error?: string; children: React.ReactElement<Record<string, unknown>>; className?: string }) {
-  const id = `f-${name}`;
+export function Field({ label, name, hint, error, children, className, idPrefix }: { label: string; name: string; hint?: string; error?: string; children: React.ReactElement<Record<string, unknown>>; className?: string; idPrefix?: string }) {
+  const id = `${idPrefix ?? "f"}-${name}`;
   const describedBy = [hint ? `${id}-hint` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>

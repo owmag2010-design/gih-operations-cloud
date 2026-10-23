@@ -4,10 +4,10 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 
 | # | Limitation | Impact | Plan |
 |---|---|---|---|
-| L1 | Email sending is not connected (no Resend key). Invitations show a one-time link for the inviter to pass on; password-reset links are only logged in development | Password reset cannot be self-served in production until Resend is connected | Add `RESEND_API_KEY` after DNS verification |
+| L1 | Email sends only once `RESEND_API_KEY` is set; until then messages are saved as "Not sent". Invitations still show a one-time link. Firm emails send from @thegih.com addresses until each firm's own domain is verified in Resend | Clients see thegih.com sender addresses for firm mail | Verify veritasemigrate.com, mimshacgroup.com and Nextmove's domain in Resend, then change each mailbox's "Send from" |
 | L2 | Authentication is self-hosted (sessions, argon2id, TOTP) rather than a managed provider | Meets the release's needs; no SSO, passkeys or SMS | Revisit after the security review; module boundary allows replacement |
-| L3 | Proposals, cases, tasks, documents, client portal, knowledge, AI, finance, communications and automation are not built | Navigation lists them as not yet released | Releases 2–6 |
-| L4 | Service catalogue is read-only and has no fees for Nextmove Advisory | Fees can't be edited in the app yet | Release 2 adds editing with version history; Nextmove fees to be supplied |
+| L3 | Cases, tasks, documents, client portal, knowledge, AI, finance, communications and automation are not built | Navigation lists them as not yet released | Releases 2–6 |
+| L4 | Nextmove Advisory has no fees in its catalogue | Nextmove proposals need custom items | Supply Nextmove's fee schedule |
 | L5 | Custom lead fields are stored (`custom_fields`) but there's no screen to define them | Not usable yet | Release 2 |
 | L6 | Duplicate detection matches exact email or normalised phone within a firm only | Name-based or cross-firm duplicates aren't flagged on leads (Hub intake checks the last 30 days across the Hub) | Add fuzzy matching with migration utilities |
 | L7 | Throttling and rate limits are database-based | Fine at current volume; not a DDoS defence | Edge rate limiting on the hosting platform |
@@ -20,3 +20,8 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L15 | Row-level security relies on per-transaction settings that the application sets itself | A compromised application role could widen its own scope; the database protects against application bugs, not against a stolen app connection | Accepted design assumption; keep the app credential tightly held |
 | L16 | The organisation audit log (group `audit:view`) lists event summaries for all firms, including firms that don't share metrics | Summaries use references, not names, but reveal activity volume | Decide with the firms; filter by firm policy if required |
 | L17 | A few same-firm links (assigned user, department, routed lead) are enforced in the application, not by database keys | Low risk; services validate them | Add constraints when those tables next change |
+| L18 | Received email attachments are listed but not downloadable in the app | Staff open them from the original mailbox | Download through Resend into document storage (Release 4) |
+| L19 | Proposal PDFs use each firm's colours and layout but not yet the approved photo-led designs (hero photos, portrait) | Less polished than the hand-built proposals | Port the approved designs and photo library |
+| L20 | Proposals have no AI first draft and no online deposit payment | Drafting and payment are manual | Anthropic API key; Stripe payment links |
+| L21 | Accepting a proposal does not convert the lead automatically | A consultant converts the lead after the deposit | Convert on deposit once payments are connected |
+| L22 | Inbound mail from a thread tag is trusted to identify the conversation | A sender who learns a tagged address could post into that conversation | Acceptable: the tag is a random 128-bit id; messages show the real sender |

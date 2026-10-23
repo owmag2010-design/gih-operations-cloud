@@ -10,6 +10,10 @@ import { createSavedView, deleteSavedView } from "@/server/modules/crm/views";
 import { addDepartment, addStage, moveStage, updateFirmPolicies, updateFirmProfile, updateStage } from "@/server/modules/org/firms";
 import { changeFirmRole, removeFirmMembership, updateMembershipDetails } from "@/server/modules/people/people";
 import { createService, updateService } from "@/server/modules/services/services";
+import {
+  addProposalItem, approveProposal, createProposalFromLead, releaseProposal, removeProposalItem, renewLink, requestChanges,
+  reviseProposal, submitForReview, updateProposal, updateProposalItem, withdrawProposal,
+} from "@/server/modules/proposals/proposals";
 import { requireFirm } from "@/server/next/session";
 
 const data = (f: FormData) => Object.fromEntries([...f.keys()].map((k) => [k, f.getAll(k).length > 1 ? f.getAll(k).map(String) : String(f.get(k))]));
@@ -337,4 +341,88 @@ export async function createServiceAction(slug: string, _: ActionResult | null, 
   }
   revalidatePath(`/f/${slug}/settings`, "layout");
   redirect(`/f/${slug}/settings/services/${id}`);
+}
+
+/* ───────── Proposals ───────── */
+
+export async function createProposalAction(slug: string, leadId: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  let id: string;
+  try {
+    id = (await createProposalFromLead(ctx, firm.firmId, leadId, { serviceIds: form.getAll("serviceId").map(String).filter(Boolean) })).id;
+  } catch (err) {
+    return toActionError(err);
+  }
+  revalidatePath(`/f/${slug}/proposals`);
+  redirect(`/f/${slug}/proposals/${id}`);
+}
+
+export type ProposalDetailsPayload = { title: string; recipientName: string; recipientEmail: string; validDays: number; currency: string; sections: { key: string; title: string; body: string }[] };
+
+export async function saveProposalAction(slug: string, id: string, payload: ProposalDetailsPayload): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    await updateProposal(ctx, firm.firmId, id, payload);
+    revalidatePath(`/f/${slug}/proposals/${id}`);
+    return { ok: true, message: "Proposal saved." };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+export async function addProposalItemAction(slug: string, id: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    const serviceId = str(form, "serviceId");
+    await addProposalItem(ctx, firm.firmId, id, serviceId ? { serviceId } : { label: str(form, "label"), description: str(form, "description"), quantity: str(form, "quantity") || "1", unit: str(form, "unit"), deposit: str(form, "deposit") });
+    revalidatePath(`/f/${slug}/proposals/${id}`);
+    return { ok: true, message: "Item added." };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+export async function updateProposalItemAction(slug: string, id: string, itemId: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    await updateProposalItem(ctx, firm.firmId, id, itemId, { label: str(form, "label"), description: str(form, "description"), quantity: str(form, "quantity") || "1", unit: str(form, "unit"), deposit: str(form, "deposit") });
+    revalidatePath(`/f/${slug}/proposals/${id}`);
+    return { ok: true, message: "Item updated." };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+export async function removeProposalItemAction(slug: string, id: string, itemId: string): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    await removeProposalItem(ctx, firm.firmId, id, itemId);
+    revalidatePath(`/f/${slug}/proposals/${id}`);
+    return { ok: true, message: "Item removed." };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+type Step = "submit" | "approve" | "release" | "renew" | "withdraw" | "revise" | "changes";
+
+export async function proposalStepAction(slug: string, id: string, step: Step, note?: string): Promise<ActionResult<{ url?: string; validUntil?: string }>> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    let data: { url?: string; validUntil?: string } | undefined;
+    let message = "";
+    switch (step) {
+      case "submit": await submitForReview(ctx, firm.firmId, id); message = "Sent for review."; break;
+      case "approve": await approveProposal(ctx, firm.firmId, id); message = "Approved. It can now be sent to the client."; break;
+      case "changes": await requestChanges(ctx, firm.firmId, id, note ?? ""); message = "Sent back for changes."; break;
+      case "release": data = await releaseProposal(ctx, firm.firmId, id); message = "Proposal sent. Copy the client link now."; break;
+      case "renew": data = await renewLink(ctx, firm.firmId, id, 14); message = "New link created. The old link no longer works."; break;
+      case "withdraw": await withdrawProposal(ctx, firm.firmId, id); message = "Proposal withdrawn."; break;
+      case "revise": await reviseProposal(ctx, firm.firmId, id); message = "Reopened for editing."; break;
+    }
+    revalidatePath(`/f/${slug}/proposals`, "layout");
+    return { ok: true, message, data };
+  } catch (err) {
+    return toActionError(err);
+  }
 }
