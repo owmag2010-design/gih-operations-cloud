@@ -7,6 +7,10 @@
 name: Database
 
 on:
+  # Database changes apply themselves when they reach these branches.
+  push:
+    branches: [main, release-2-proposals]
+    paths: ["drizzle/**", "scripts/seed.ts", "scripts/seed-lib.ts", "data/config/**", ".github/workflows/database.yml"]
   workflow_dispatch:
     inputs:
       task:
@@ -24,6 +28,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: database
+  cancel-in-progress: false
+
 jobs:
   database:
     runs-on: ubuntu-latest
@@ -40,13 +48,13 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Migrate
-        if: inputs.task != 'create-admin'
+        if: github.event_name == 'push' || inputs.task != 'create-admin'
         run: npx tsx scripts/migrate.ts
       - name: Seed configuration
-        if: inputs.task == 'migrate-and-seed'
+        if: github.event_name == 'push' || inputs.task == 'migrate-and-seed'
         run: npx tsx scripts/seed.ts
       - name: Create administrator
-        if: inputs.task == 'create-admin'
+        if: github.event_name == 'workflow_dispatch' && inputs.task == 'create-admin'
         env:
           ADMIN_EMAIL: ${{ inputs.admin_email }}
           ADMIN_NAME: ${{ inputs.admin_name }}
