@@ -16,6 +16,7 @@ import { getMatter, matterFormOptions } from "@/server/modules/matters/matters";
 import { listNotes } from "@/server/modules/notes/notes";
 import { listTasks, taskFormOptions } from "@/server/modules/tasks/tasks";
 import { requireFirm } from "@/server/next/session";
+import { DocumentsPanel } from "../../documents/matter-panel";
 import { Timeline } from "../../timeline";
 import {
   AdjustDateDialog, CompleteDateButton, DateDialogs, EditMatterDialog, FactDialog, PersonDialog, RemoveFactButton, RemovePersonButton, StageBar, TeamControls, VerifyFactDialog,
@@ -167,6 +168,8 @@ export default async function MatterPage({ params, searchParams }: PageProps<"/f
             <PanelHeader title="Tasks" actions={<Link href={`/tasks?view=team`} className="text-[13px] text-ink-2 hover:text-ink">All tasks →</Link>} />
             <TaskList tasks={tasks} options={options} meId={ctx.user.id} showPractice={false} empty="No tasks on this matter. Add one, or set up task templates by stage in Settings." />
           </Panel>
+
+          <DocumentsPanel ctx={ctx} firmId={firm.firmId} slug={firm.slug} link={{ matterId: matter.id }} />
 
           <Panel>
             <PanelHeader title="Notes" />

@@ -12,6 +12,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_ROLES } from "../src/server/access/permissions";
+import { DOCUMENT_STARTERS } from "./document-starters";
 import type { EmailBlock } from "../src/server/db/schema";
 import { sanitizeTemplateHtml } from "../src/server/modules/email/html-template";
 
@@ -237,6 +238,18 @@ export async function runSeed(db: NodePgDatabase<typeof s>, log: (m: string) => 
       await tx.insert(s.emailTemplates).values(STARTER_TEMPLATES.map((t) => ({ ...t, orgId: org.id, firmId: null })));
       log(`  + ${STARTER_TEMPLATES.length} starter email templates (Hub, shared with firms)`);
     }
+    // Starter document templates for each practice (structure only; added once, never overwritten).
+    let starters = 0;
+    for (const slug of Object.keys(firmIds)) {
+      for (const d of DOCUMENT_STARTERS) {
+        const [row] = await tx.insert(s.documentTemplates).values({ firmId: firmIds[slug], kind: d.kind, name: d.name, description: d.description, content: d.content, isStarter: true }).onConflictDoNothing().returning();
+        if (row) {
+          await tx.insert(s.documentTemplateVersions).values({ firmId: row.firmId, templateId: row.id, version: 1, name: row.name, content: row.content });
+          starters++;
+        }
+      }
+    }
+    if (starters) log(`  + ${starters} starter document templates`);
     // Imported HTML templates (designs taken from sent emails and the Veritas template folder; no client data).
     let imported = 0;
     for (const [dir, firmSlug, manifestName] of [["gih", null, "manifest.json"], ["veritas", "veritas", "manifest-html.json"]] as const) {

@@ -1529,3 +1529,152 @@ export const paymentEvents = pgTable(
   },
   (t) => [uniqueIndex("payment_events_provider_event_uq").on(t.provider, t.eventId)],
 );
+
+/* ───────────────────── Documents (milestone 3) ───────────────────── */
+
+export const documentKind = pgEnum("document_kind", ["letter", "representation", "consultation_report", "roadmap", "engagement", "submission_pack", "precedent", "other"]);
+export const documentStatus = pgEnum("document_status", ["draft", "in_review", "changes_requested", "approved", "final"]);
+export const documentCommentKind = pgEnum("document_comment_kind", ["comment", "changes_requested", "approved"]);
+export const ocrStatus = pgEnum("ocr_status", ["not_needed", "pending", "done", "failed", "unsupported"]);
+
+/** Rich-text content: a ProseMirror (Tiptap) document. */
+export type DocContent = { type: "doc"; content?: DocNode[] };
+export type DocNode = { type: string; attrs?: Record<string, unknown>; content?: DocNode[]; text?: string; marks?: { type: string; attrs?: Record<string, unknown> }[] };
+
+/** Branded templates per practice, with merge fields such as {{client.fullName}}. */
+export const documentTemplates = pgTable(
+  "document_templates",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    kind: documentKind("kind").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    content: jsonb("content").$type<DocContent>().notNull(),
+    letterhead: boolean("letterhead").notNull().default(true),
+    isActive: boolean("is_active").notNull().default(true),
+    /** Starter templates are structure only, to be completed by the practice. */
+    isStarter: boolean("is_starter").notNull().default(false),
+    version: integer("version").notNull().default(1),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("document_templates_firm_name_uq").on(t.firmId, t.name)],
+);
+
+export const documentTemplateVersions = pgTable(
+  "document_template_versions",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    templateId: uuid("template_id").notNull(),
+    version: integer("version").notNull(),
+    name: text("name").notNull(),
+    content: jsonb("content").$type<DocContent>().notNull(),
+    editedById: uuid("edited_by_id").references(() => users.id, { onDelete: "set null" }),
+    editedAt: timestamp("edited_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("document_template_versions_uq").on(t.templateId, t.version)],
+);
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    ref: text("ref").notNull(),
+    kind: documentKind("kind").notNull(),
+    title: text("title").notNull(),
+    status: documentStatus("status").notNull().default("draft"),
+    clientId: uuid("client_id"),
+    matterId: uuid("matter_id"),
+    templateId: uuid("template_id"),
+    templateVersion: integer("template_version"),
+    letterhead: boolean("letterhead").notNull().default(true),
+    /** Working copy, autosaved while drafting. Saved versions are in document_versions. */
+    content: jsonb("content").$type<DocContent>().notNull(),
+    contentUpdatedAt: timestamp("content_updated_at", { withTimezone: true }).notNull().defaultNow(),
+    contentUpdatedById: uuid("content_updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    /** Latest saved version number (0 = none yet). */
+    version: integer("version").notNull().default(0),
+    finalVersion: integer("final_version"),
+    aiAssisted: boolean("ai_assisted").notNull().default(false),
+    reviewerId: uuid("reviewer_id").references(() => users.id, { onDelete: "set null" }),
+    approvedById: uuid("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    finalisedById: uuid("finalised_by_id").references(() => users.id, { onDelete: "set null" }),
+    finalisedAt: timestamp("finalised_at", { withTimezone: true }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("documents_firm_ref_uq").on(t.firmId, t.ref), index("documents_matter_idx").on(t.matterId), index("documents_client_idx").on(t.clientId), index("documents_firm_status_idx").on(t.firmId, t.status, t.updatedAt)],
+);
+
+/** Saved versions. Never changed or deleted; the final version also keeps its PDF. */
+export const documentVersions = pgTable(
+  "document_versions",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    documentId: uuid("document_id").notNull(),
+    matterId: uuid("matter_id"),
+    version: integer("version").notNull(),
+    title: text("title").notNull(),
+    content: jsonb("content").$type<DocContent>().notNull(),
+    note: text("note"),
+    isFinal: boolean("is_final").notNull().default(false),
+    pdf: bytea("pdf"),
+    pdfSha256: text("pdf_sha256"),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("document_versions_uq").on(t.documentId, t.version)],
+);
+
+export const documentComments = pgTable(
+  "document_comments",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    documentId: uuid("document_id").notNull(),
+    matterId: uuid("matter_id"),
+    version: integer("version"),
+    kind: documentCommentKind("kind").notNull().default("comment"),
+    body: text("body").notNull(),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedById: uuid("resolved_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("document_comments_doc_idx").on(t.documentId, t.createdAt)],
+);
+
+/** Uploaded files (scans, client documents). The original is kept unchanged; OCR text is stored beside it, marked machine-generated. */
+export const documentFiles = pgTable(
+  "document_files",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    clientId: uuid("client_id"),
+    matterId: uuid("matter_id"),
+    documentId: uuid("document_id"),
+    filename: text("filename").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    sha256: text("sha256").notNull(),
+    data: bytea("data").notNull(),
+    description: text("description"),
+    ocrStatus: ocrStatus("ocr_status").notNull().default("pending"),
+    ocrText: text("ocr_text"),
+    ocrEngine: text("ocr_engine"),
+    ocrConfidence: integer("ocr_confidence"),
+    ocrError: text("ocr_error"),
+    ocrAt: timestamp("ocr_at", { withTimezone: true }),
+    uploadedById: uuid("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("document_files_matter_idx").on(t.matterId), index("document_files_client_idx").on(t.clientId), index("document_files_firm_idx").on(t.firmId, t.createdAt)],
+);

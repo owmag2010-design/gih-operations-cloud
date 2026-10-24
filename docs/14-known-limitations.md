@@ -50,7 +50,7 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L40 | Business-day deadlines skip weekends only | Public holidays are not excluded; the basis text says so | Holiday calendars per jurisdiction, reviewed by each practice |
 | L41 | No deadline rules are pre-loaded | Calculated deadlines need a practice administrator to add and validate each rule with its source | By design: rules must come from the practice, not from the software |
 | L42 | Client-visible notes are only classified | There is no client portal yet to show them in | Client portal (Milestone 4) |
-| L43 | Matter checklists, documents and fees per matter aren't built | The matter shows the linked proposal only | Documents and finance (Milestone 3) |
+| L43 | Matter checklists aren't built (documents, files and invoices now are) | No per-matter document checklist yet | Checklists by service |
 | L44 | The Airtable mirror is read-only | Changes must still be made in Airtable | Write-back design in docs/16-airtable-mirror.md |
 | L45 | ~~The Airtable mirror needs `AIRTABLE_TOKEN`~~ | Resolved 24 Oct 2026: token added in Vercel | — |
 | L46 | Airtable record search is a simple text match over field values | Fine for current volumes | Full-text index if tables grow large |
@@ -67,3 +67,18 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L52 | No instalment plans beyond deposit and balance from a proposal | Other schedules are separate invoices made by hand | Payment schedules on proposals if practices need them |
 | L53 | Discounts reduce the taxable base proportionally across taxable lines | Matches common practice; a line-specific discount isn't modelled | Revisit if a practice needs it |
 | L54 | No foreign-exchange handling: each currency is reported separately | Totals across currencies aren't shown | By design |
+
+## Added 24 Oct 2026 (milestone 3: documents)
+
+| # | Limitation | Impact | Plan |
+|---|---|---|---|
+| L55 | Scanned PDFs without a text layer aren't OCR'd | Marked "upload pages as images" | Rasterise PDF pages server-side for OCR |
+| L56 | OCR reads English only | Other languages come out poorly | Add language packs when needed |
+| L57 | Uploaded files are stored in PostgreSQL, up to 4 MB each | Large scans must be split or compressed | Object storage with direct uploads |
+| L58 | AI drafting needs `ANTHROPIC_API_KEY` and sends the linked records to Anthropic's API | Off until the key is added; a data-sharing decision for each practice | Owen decides; add a per-practice switch if practices differ |
+| L59 | No simultaneous co-editing; a second editor's save is refused instead of merged | Two people shouldn't edit the same draft at once | Real-time collaboration if needed |
+| L60 | The editor has no tables or images; the letterhead is text (name, details, colour), not the logo image | Tables must be lists for now | Tables and logo images in exports |
+| L61 | Starter templates are structure only | Each practice must write its own wording | By design: wording comes from the practice |
+| L62 | No tracked changes; review is by comments and versions | Reviewers can't redline inside the text | Suggestion mode in the editor |
+| L63 | No e-signature on final documents | Sign outside the app | DocuSign or similar |
+| L64 | OCR runs during the upload request (up to 60 seconds) | Large or complex images can time out and show "Couldn't read" with Read again | Background job queue |

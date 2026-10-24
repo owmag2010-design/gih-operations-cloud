@@ -13,6 +13,7 @@ import { NotesPanel } from "@/components/work/notes";
 import { Lock } from "lucide-react";
 import { ComposeDialog } from "@/components/email/client";
 import { requireFirm } from "@/server/next/session";
+import { DocumentsPanel } from "../../documents/matter-panel";
 import { Timeline } from "../../timeline";
 
 export const metadata: Metadata = { title: "Client" };
@@ -73,6 +74,7 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/f
               ) : <p className="p-4 text-[13px] text-muted">No matters yet. Open one when the client goes ahead with a service.</p>}
             </Panel>
           ) : null}
+          <DocumentsPanel ctx={ctx} firmId={firm.firmId} slug={firm.slug} link={{ clientId: client.id }} />
           <Panel>
             <PanelHeader title="Notes" />
             <NotesPanel

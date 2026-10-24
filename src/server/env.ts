@@ -44,6 +44,9 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().trim().optional().default(""),
   /** Airtable personal access token (read-only scopes) for the Airtable mirror. Empty = mirror not connected. */
   AIRTABLE_TOKEN: z.string().trim().optional().default(""),
+  /** AI drafting (optional). Without a key, drafting assistance is switched off and says so. */
+  ANTHROPIC_API_KEY: z.string().trim().optional().default(""),
+  ANTHROPIC_MODEL: z.string().trim().optional().default("claude-sonnet-5-5"),
   /** Vercel Cron sends this as a bearer token to /api/cron/*. */
   CRON_SECRET: z.string().trim().optional().default(""),
 });

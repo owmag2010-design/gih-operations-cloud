@@ -30,6 +30,9 @@ export default async function setup() {
   const [veritas] = await db.select().from(s.firms).where(eq(s.firms.slug, "veritas"));
   const [fo] = await db.insert(s.users).values({ orgId: org.id, email: "finance.e2e@example.test", name: "Fin Officer", passwordHash, status: "active", kind: "staff" }).returning();
   await db.insert(s.firmMemberships).values({ firmId: veritas.id, userId: fo.id, roleId: financeRole.id });
+  const [reviewerRole] = await db.select().from(s.roles).where(eq(s.roles.key, "reviewer"));
+  const [rv] = await db.insert(s.users).values({ orgId: org.id, email: "reviewer.e2e@example.test", name: "Rita Reviewer", passwordHash, status: "active", kind: "staff" }).returning();
+  await db.insert(s.firmMemberships).values({ firmId: veritas.id, userId: rv.id, roleId: reviewerRole.id });
   await pool.end();
   writeFileSync("tests/e2e/.state.json", JSON.stringify({ password: PASSWORD }));
 }

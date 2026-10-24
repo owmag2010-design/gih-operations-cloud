@@ -60,7 +60,8 @@ export function firmNav(ctx: AccessContext, firmId: string, slug: string, opts: 
   if (ctx.has("clients:view_all", firmId) || ctx.has("clients:view_assigned", firmId)) items.push({ label: "Clients & Matters", short: "Clients & matters", href: `${base}/clients`, icon: "user-round", match: [`${base}/matters`, "/airtable"] });
   else if (ctx.has("matters:view_all", firmId) || ctx.has("matters:view_assigned", firmId)) items.push({ label: "Clients & Matters", short: "Matters", href: `${base}/matters`, icon: "user-round" });
   items.push({ label: "Tasks & Calendar", short: "Tasks", href: "/tasks", icon: "calendar", match: ["/calendar"], badge: opts.tasksDue, badgeLabel: "overdue" });
-  if (ctx.has("email:view", firmId) || ctx.has("templates:manage", firmId)) items.push({ label: "Documents & Templates", short: "Documents", href: `${base}/templates`, icon: "folder" });
+  if (ctx.has("documents:view", firmId)) items.push({ label: "Documents & Templates", short: "Documents", href: `${base}/documents`, icon: "folder", match: [`${base}/templates`] });
+  else if (ctx.has("email:view", firmId) || ctx.has("templates:manage", firmId)) items.push({ label: "Documents & Templates", short: "Documents", href: `${base}/templates`, icon: "folder" });
   if (ctx.has("invoices:view", firmId)) items.push({ label: "Proposals & Finance", short: "Finance", href: `${base}/finance`, icon: "wallet", match: [`${base}/proposals`] });
   else if (ctx.has("proposals:view", firmId)) items.push({ label: "Proposals & Finance", short: "Finance", href: `${base}/proposals`, icon: "wallet" });
   items.push({ label: "Knowledge & Updates", short: "Knowledge", href: soon("knowledge"), icon: "book", soon: "Milestone 4" });

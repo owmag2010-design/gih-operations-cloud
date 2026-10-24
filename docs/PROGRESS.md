@@ -1,5 +1,21 @@
 # Progress Log
 
+## 24 Oct 2026: Milestone 3 (part 2): document workspace
+**Done (tested):**
+- **Documents** (`src/server/modules/documents`, docs/18-documents.md): letters, representations, consultation reports, roadmaps, engagement documents, submission packs and precedents, linked to clients and matters (restricted matters respected in the database).
+- **Templates** per practice with validated merge fields and version history; six starter templates per practice (structure only, labelled).
+- **Rich editor** (Tiptap) with autosave, conflict protection, highlighted merge fields and `[[…]]` gaps, saved versions and restore.
+- **Review**: draft → in review → changes requested / approved → final; a second person reviews; gaps block approval; comments. Final documents keep their PDF byte for byte and can't be changed (database trigger and privileges); revise by starting a new document from them.
+- **Export** to PDF and Word on the practice letterhead with page numbers and draft marking.
+- **Uploads with OCR**: originals kept unchanged; Tesseract (English, bundled) for images, text layer for PDFs; text labelled machine-generated.
+- **AI drafting assistance** from the linked client and matter records only, with fact basis labels and `[[GAP: …]]` markers; off until an Anthropic API key is added.
+- Matter and client pages show their documents and files. Navigation: Documents & Templates opens the document workspace (email templates are a tab). New permissions `documents:view/edit/approve`, `document_templates:manage`. Migrations 0022–0023.
+- Tests: 108 unit/integration and 14 end-to-end (document flow including OCR upload, review, final, PDF and Word export, with axe).
+
+**Optional for Owen:** `ANTHROPIC_API_KEY` in Vercel to switch on AI drafting (decide first whether client records may be sent to Anthropic's API).
+
+**Next:** Milestone 4: team chat, client messaging, legal library, monitoring and content.
+
 ## 24 Oct 2026: Milestone 3 (part 1): invoices, payments and reconciliation
 **Done (tested):**
 - **Invoices** per practice (`src/server/modules/finance`, docs/17-finance.md): drafts with line types (professional, government, third-party, disbursement, discount), quantities, tax on taxable lines only, discounts, currencies, terms and notes; gap-free numbering per entity assigned on issue; issued invoices locked in the database and corrected only by numbered credit notes; void with reason; overdue derived from the due date. Branded A4 PDF (Veritas, Mimshac, Nextmove, Hub default) with the practice details frozen at issue.
