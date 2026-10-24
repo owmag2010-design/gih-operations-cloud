@@ -154,7 +154,9 @@ export async function syncSource(orgId: string, sourceId: string, opts: { kind?:
   const found = await withScope(lookup, (tx) => loadSource(tx, sourceId));
   const scope = systemScope(orgId, found.firmId);
   const s = await withScope(scope, (tx) => loadSource(tx, sourceId));
-  const kind: "full" | "incremental" = opts.kind === "full" || opts.kind === "incremental" ? opts.kind : !s.lastFullSyncAt || Date.now() - s.lastFullSyncAt.getTime() > FULL_EVERY_MS || !s.cursor ? "full" : "incremental";
+  // A dataset that has never had a full sync gets one, whatever was asked, so removals can be detected from then on.
+  const needsFull = !s.lastFullSyncAt || !s.cursor;
+  const kind: "full" | "incremental" = opts.kind === "full" || needsFull ? "full" : opts.kind === "incremental" ? "incremental" : Date.now() - s.lastFullSyncAt!.getTime() > FULL_EVERY_MS ? "full" : "incremental";
   const started = new Date();
   const [run] = await withScope(scope, (tx) => tx.insert(airtableSyncRuns).values({ orgId, firmId: s.firmId, sourceId: s.id, kind, trigger: opts.trigger }).returning());
   const tally = { fetched: 0, created: 0, updated: 0, unchanged: 0, removed: 0, restored: 0 };
