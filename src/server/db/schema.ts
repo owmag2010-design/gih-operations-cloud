@@ -106,6 +106,10 @@ export const taskStatus = pgEnum("task_status", ["open", "done", "cancelled"]);
 export const taskRecurrence = pgEnum("task_recurrence", ["none", "daily", "weekly", "monthly", "yearly"]);
 export const taskAssignRule = pgEnum("task_assign_rule", ["case_manager", "consultant", "unassigned"]);
 export const noteVisibility = pgEnum("note_visibility", ["internal", "client_visible"]);
+export const invoiceStatus = pgEnum("invoice_status", ["draft", "issued", "partially_paid", "paid", "credited", "void"]);
+export const paymentStatus = pgEnum("payment_status", ["pending", "verified", "rejected", "refunded"]);
+export const paymentMethod = pgEnum("payment_method", ["stripe", "eft", "cash", "card_machine", "other"]);
+export const invoiceLineKind = pgEnum("invoice_line_kind", ["professional", "government", "third_party", "disbursement", "discount"]);
 export const mirrorTruth = pgEnum("mirror_source_of_truth", ["airtable", "dashboard", "shared"]);
 export const mirrorRunStatus = pgEnum("mirror_run_status", ["running", "ok", "error"]);
 export const mirrorRunKind = pgEnum("mirror_run_kind", ["full", "incremental"]);
@@ -1377,4 +1381,151 @@ export const airtableSyncRuns = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
   (t) => [index("airtable_sync_runs_source_idx").on(t.sourceId, t.startedAt)],
+);
+
+/* ───────────────────── Finance (milestone 3) ───────────────────── */
+
+/** Billing set-up per practice (each practice invoices as its own legal entity). */
+export const firmBilling = pgTable("firm_billing", {
+  firmId: uuid("firm_id").primaryKey().references(() => firms.id, { onDelete: "cascade" }),
+  invoicePrefix: text("invoice_prefix").notNull().default("INV"),
+  creditNotePrefix: text("credit_note_prefix").notNull().default("CN"),
+  defaultCurrency: text("default_currency").notNull().default("ZAR"),
+  paymentTermsDays: integer("payment_terms_days").notNull().default(7),
+  /** Basis points (1500 = 15%). Null = not registered for tax; no tax line is shown. */
+  taxRateBp: integer("tax_rate_bp"),
+  taxLabel: text("tax_label"),
+  taxNumber: text("tax_number"),
+  registrationNumber: text("registration_number"),
+  address: text("address"),
+  bankDetails: text("bank_details"),
+  invoiceTerms: text("invoice_terms"),
+  invoiceFooter: text("invoice_footer"),
+  updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: updatedAt(),
+});
+
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    /** Assigned when issued; drafts have none so numbering has no gaps. */
+    number: text("number"),
+    clientId: uuid("client_id").notNull(),
+    matterId: uuid("matter_id"),
+    proposalId: uuid("proposal_id"),
+    status: invoiceStatus("status").notNull().default("draft"),
+    currency: text("currency").notNull(),
+    issueDate: date("issue_date"),
+    dueDate: date("due_date"),
+    subtotalMinor: integer("subtotal_minor").notNull().default(0),
+    discountMinor: integer("discount_minor").notNull().default(0),
+    taxMinor: integer("tax_minor").notNull().default(0),
+    totalMinor: integer("total_minor").notNull().default(0),
+    paidMinor: integer("paid_minor").notNull().default(0),
+    creditedMinor: integer("credited_minor").notNull().default(0),
+    taxRateBp: integer("tax_rate_bp"),
+    billToName: text("bill_to_name").notNull(),
+    billToEmail: citext("bill_to_email"),
+    billToAddress: text("bill_to_address"),
+    reference: text("reference"),
+    terms: text("terms"),
+    notes: text("notes"),
+    /** Practice details as printed on the issued invoice (kept so later edits don't change it). */
+    issuedSnapshot: jsonb("issued_snapshot").$type<Record<string, unknown>>(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }),
+    issuedById: uuid("issued_by_id").references(() => users.id, { onDelete: "set null" }),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
+    voidReason: text("void_reason"),
+    checkoutUrl: text("checkout_url"),
+    checkoutSessionId: text("checkout_session_id"),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("invoices_firm_number_uq").on(t.firmId, t.number), index("invoices_firm_status_idx").on(t.firmId, t.status, t.dueDate), index("invoices_client_idx").on(t.clientId)],
+);
+
+export const invoiceLines = pgTable(
+  "invoice_lines",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    invoiceId: uuid("invoice_id").notNull(),
+    position: integer("position").notNull().default(0),
+    kind: invoiceLineKind("kind").notNull().default("professional"),
+    description: text("description").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    unitMinor: integer("unit_minor").notNull(),
+    /** Whether tax applies to this line (government and third-party fees are usually pass-through). */
+    taxable: boolean("taxable").notNull().default(true),
+    totalMinor: integer("total_minor").notNull(),
+    serviceId: uuid("service_id"),
+  },
+  (t) => [index("invoice_lines_invoice_idx").on(t.invoiceId, t.position)],
+);
+
+/**
+ * Money received. Only verified payments count towards an invoice: Stripe
+ * payments are verified by a signed webhook; bank transfers and cash by a
+ * person checking the bank statement, recorded with the reference.
+ */
+export const payments = pgTable(
+  "payments",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    invoiceId: uuid("invoice_id"),
+    clientId: uuid("client_id"),
+    amountMinor: integer("amount_minor").notNull(),
+    currency: text("currency").notNull(),
+    method: paymentMethod("method").notNull(),
+    status: paymentStatus("status").notNull().default("pending"),
+    provider: text("provider"),
+    providerRef: text("provider_ref"),
+    receivedOn: date("received_on").notNull(),
+    reference: text("reference"),
+    note: text("note"),
+    recordedById: uuid("recorded_by_id").references(() => users.id, { onDelete: "set null" }),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    verifiedById: uuid("verified_by_id").references(() => users.id, { onDelete: "set null" }),
+    verifiedBy: text("verified_by"),
+    rejectedReason: text("rejected_reason"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("payments_provider_ref_uq").on(t.provider, t.providerRef), index("payments_invoice_idx").on(t.invoiceId), index("payments_firm_status_idx").on(t.firmId, t.status)],
+);
+
+export const creditNotes = pgTable(
+  "credit_notes",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    invoiceId: uuid("invoice_id").notNull(),
+    number: text("number").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    reason: text("reason").notNull(),
+    issuedById: uuid("issued_by_id").references(() => users.id, { onDelete: "set null" }),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("credit_notes_firm_number_uq").on(t.firmId, t.number), index("credit_notes_invoice_idx").on(t.invoiceId)],
+);
+
+/** Signed provider webhooks, kept for audit and replay protection. */
+export const paymentEvents = pgTable(
+  "payment_events",
+  {
+    id: id(),
+    provider: text("provider").notNull(),
+    eventId: text("event_id").notNull(),
+    type: text("type").notNull(),
+    firmId: uuid("firm_id").references(() => firms.id),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    outcome: text("outcome"),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("payment_events_provider_event_uq").on(t.provider, t.eventId)],
 );

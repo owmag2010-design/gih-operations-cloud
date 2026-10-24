@@ -49,6 +49,10 @@ export const FIRM_PERMISSIONS = [
   "matters:create",
   "matters:edit",
   "tasks:view_team",
+  "invoices:view",
+  "invoices:edit",
+  "invoices:issue",
+  "payments:verify",
   "metrics:firm",
   "audit:firm",
   "services:manage",
@@ -109,6 +113,10 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "matters:create": "Open matters",
   "matters:edit": "Edit matters, people, facts and dates",
   "tasks:view_team": "See the practice's team tasks and everyone's assigned tasks",
+  "invoices:view": "View invoices, payments and finance reports",
+  "invoices:edit": "Prepare draft invoices",
+  "invoices:issue": "Issue, void and credit invoices; change billing settings",
+  "payments:verify": "Record and verify payments",
   "metrics:firm": "View firm metrics",
   "audit:firm": "View firm audit log",
   "services:manage": "Edit services and fees",
@@ -162,7 +170,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
       "firm:view", "team:view", "leads:view_all", "leads:create", "leads:edit", "leads:assign",
       "leads:convert", "clients:view_all", "clients:create", "clients:edit", "metrics:firm",
       "proposals:view", "proposals:create", "proposals:edit", "email:view", "email:send",
-      "matters:view_all", "matters:create", "matters:edit", "tasks:view_team",
+      "matters:view_all", "matters:create", "matters:edit", "tasks:view_team", "invoices:view", "invoices:edit",
     ],
   },
   {
@@ -172,7 +180,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
     description: "Manages client matters.",
     permissions: [
       "firm:view", "team:view", "leads:view_all", "leads:edit", "clients:view_all", "clients:edit", "metrics:firm", "proposals:view", "email:view", "email:send",
-      "matters:view_assigned", "matters:create", "matters:edit", "tasks:view_team",
+      "matters:view_assigned", "matters:create", "matters:edit", "tasks:view_team", "invoices:view",
     ],
   },
   {
@@ -194,7 +202,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
     name: "Finance Officer",
     scope: "firm",
     description: "Billing, payments and the fee schedule.",
-    permissions: ["firm:view", "clients:view_all", "metrics:firm", "services:manage", "proposals:view", "matters:view_all"],
+    permissions: ["firm:view", "clients:view_all", "metrics:firm", "services:manage", "proposals:view", "matters:view_all", "invoices:view", "invoices:edit", "invoices:issue", "payments:verify"],
   },
   {
     key: "support_officer",

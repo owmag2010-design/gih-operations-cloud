@@ -39,6 +39,9 @@ const schema = z.object({
   /** Gmail / Google Workspace mailbox connections (Google Cloud OAuth client). */
   GOOGLE_CLIENT_ID: z.string().trim().optional().default(""),
   GOOGLE_CLIENT_SECRET: z.string().trim().optional().default(""),
+  /** Stripe (test or live) secret key for invoice payment links, and the webhook signing secret. Empty = not connected. */
+  STRIPE_SECRET_KEY: z.string().trim().optional().default(""),
+  STRIPE_WEBHOOK_SECRET: z.string().trim().optional().default(""),
   /** Airtable personal access token (read-only scopes) for the Airtable mirror. Empty = mirror not connected. */
   AIRTABLE_TOKEN: z.string().trim().optional().default(""),
   /** Vercel Cron sends this as a bearer token to /api/cron/*. */

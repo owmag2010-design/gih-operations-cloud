@@ -141,6 +141,20 @@
       "when": 1792803164463,
       "tag": "0019_airtable_mirror_security",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792809101707,
+      "tag": "0020_finance",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792809129140,
+      "tag": "0021_finance_security",
+      "breakpoints": true
     }
   ]
 }
