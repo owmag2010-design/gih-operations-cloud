@@ -35,6 +35,8 @@ export type Scope = {
   /** Firms whose rows this transaction may read and write. */
   firmIds: readonly string[];
   intake?: boolean;
+  /** Hub Airtable mirror datasets (firm_id null) may be read/written. */
+  mirror?: boolean;
   auditScope?: "org" | "firm" | "";
   /** Mail sync and inbound webhooks: may read personal mailboxes' conversations. Never set from a user request. */
   mailSystem?: boolean;
@@ -57,6 +59,7 @@ export async function withScope<T>(scope: Scope, fn: (tx: Tx) => Promise<T>): Pr
       set_config('app.user_id', ${scope.userId ?? ""}, true),
       set_config('app.firm_ids', ${scope.firmIds.join(",")}, true),
       set_config('app.intake', ${scope.intake ? "on" : "off"}, true),
+      set_config('app.mirror', ${scope.mirror ? "on" : "off"}, true),
       set_config('app.audit_scope', ${scope.auditScope ?? ""}, true),
       set_config('app.mail_system', ${scope.mailSystem ? "on" : "off"}, true),
       set_config('app.matter_admin_firms', ${(scope.matterAdminFirms ?? []).join(",")}, true)`);

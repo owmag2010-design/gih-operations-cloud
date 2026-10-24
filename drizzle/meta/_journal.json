@@ -127,6 +127,20 @@
       "when": 1792801426426,
       "tag": "0017_matters_security",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792803153865,
+      "tag": "0018_airtable_mirror",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792803164463,
+      "tag": "0019_airtable_mirror_security",
+      "breakpoints": true
     }
   ]
 }

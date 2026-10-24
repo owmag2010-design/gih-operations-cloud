@@ -75,3 +75,7 @@ Environment variables in Vercel (Production):
 4. Copy the client ID and secret into `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
 
 After adding variables, redeploy. Settings › Email shows each connection as Ready or Not set up.
+
+## Airtable mirror (milestone 2)
+- `AIRTABLE_TOKEN`: an Airtable personal access token with `data.records:read` and `schema.bases:read`, limited to the mirrored bases (see docs/16-airtable-mirror.md). Production only.
+- Cron: `/api/cron/airtable-sync` every 15 minutes (in `vercel.json`), authorised by `CRON_SECRET`.

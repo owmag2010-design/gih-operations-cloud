@@ -21,6 +21,8 @@ export const GROUP_PERMISSIONS = [
   "hub_email:send",
   "hub_templates:manage",
   "mailboxes:manage",
+  "mirror:view",
+  "mirror:manage",
 ] as const;
 
 export const FIRM_PERMISSIONS = [
@@ -82,6 +84,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "hub_email:send": "Send and reply from the Hub inbox",
   "hub_templates:manage": "Manage the Hub's shared email templates",
   "mailboxes:manage": "Manage inbound mailboxes and sending addresses",
+  "mirror:view": "View the Hub's Airtable data in the mirror",
+  "mirror:manage": "Manage the Airtable mirror: tables, syncs and reconciliation",
   "firm:view": "Open the firm workspace",
   "firm:manage": "Manage firm settings and pipeline",
   "team:view": "View firm team",
@@ -140,7 +144,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
     name: "Group Operations Administrator",
     scope: "group",
     description: "Triages Hub enquiries and watches group metrics.",
-    permissions: ["firms:view", "staff:view", "intake:view", "intake:create", "intake:route", "metrics:group", "audit:view", "hub_email:send"],
+    permissions: ["firms:view", "staff:view", "intake:view", "intake:create", "intake:route", "metrics:group", "audit:view", "hub_email:send", "mirror:view"],
   },
   {
     key: "firm_admin",

@@ -185,6 +185,21 @@ export async function runSeed(db: NodePgDatabase<typeof s>, log: (m: string) => 
     }
 
     // Services from the approved fee schedule
+    // Airtable mirror: register configured tables (existing ones keep their state and edits)
+    {
+      const cfg = JSON.parse(readFileSync(join(process.cwd(), "data/config/airtable-sources.json"), "utf8")) as {
+        sources: { base: string; baseName: string; table: string; tableName: string; dataset: string; firm: string | null; mapsTo: string | null; truth: "airtable" | "dashboard" | "shared"; note: string | null }[];
+      };
+      for (const [i, c] of cfg.sources.entries()) {
+        const firmId = c.firm ? firmIds[c.firm] : null;
+        if (c.firm && !firmId) continue;
+        await tx
+          .insert(s.airtableSources)
+          .values({ orgId: org.id, firmId, baseId: c.base, baseName: c.baseName, tableId: c.table, tableName: c.tableName, dataset: c.dataset, mapsTo: c.mapsTo, sourceOfTruth: c.truth, truthNote: c.note, position: i })
+          .onConflictDoNothing();
+      }
+    }
+
     const parsed = parseFeeSchedule(readFileSync(join(process.cwd(), "data/config/fee-schedule-za-2026-10-20.md"), "utf8"));
     for (const f of FIRMS.filter((x) => x.feeSchedule)) {
       for (const p of parsed) {

@@ -7,6 +7,7 @@ import { LocalTime } from "@/components/ui/forms";
 import { Badge, EmptyState, PageHeader, Panel, tableClass as t } from "@/components/ui/primitives";
 import { fullName } from "@/lib/labels";
 import { canViewMatters, listMatters } from "@/server/modules/matters/matters";
+import { canUseMirror } from "@/server/modules/mirror/mirror";
 import { requireStaff } from "@/server/next/session";
 
 export const metadata: Metadata = { title: "Matters" };
@@ -20,6 +21,10 @@ export default async function AllMattersPage() {
   const total = lists.reduce((n, l) => n + l.data.total, 0);
   return (
     <>
+      <nav aria-label="Clients and matters" className="mb-4 flex gap-1 text-[13px]">
+        <Link href="/matters" aria-current="page" className="rounded-full bg-accent px-3.5 py-1.5 font-medium text-accent-ink">Matters</Link>
+        {canUseMirror(ctx) ? <Link href="/airtable" className="rounded-full px-3.5 py-1.5 text-ink-2 hover:bg-sunken">Airtable records</Link> : null}
+      </nav>
       <PageHeader title="Matters" description={`${total} open matter${total === 1 ? "" : "s"} across ${practices.length === 1 ? practices[0].tradingName : `${practices.length} practices`}. Each practice's records stay in that practice.`} />
       <div className="flex flex-col gap-5">
         {lists.map(({ f, data }) => (

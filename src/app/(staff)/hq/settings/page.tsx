@@ -15,6 +15,7 @@ export default async function HubSettingsPage() {
     { href: "/settings/email", title: "Email", text: "Connected mailboxes, shared inboxes and the server's email connections." },
     { href: "/settings/signatures", title: "Signatures", text: "Your signature and each practice's default." },
     ctx.has("audit:view") && { href: "/hq/audit", title: "Audit log", text: "Who did what, across the organisation." },
+    (ctx.has("mirror:view") || ctx.has("mirror:manage")) && { href: "/airtable", title: "Airtable mirror", text: "Mirrored Airtable tables, sync status, field mapping and reconciliation." },
   ].filter(Boolean) as { href: string; title: string; text: string }[];
   if (!items.length) notFound();
   return (
@@ -22,7 +23,7 @@ export default async function HubSettingsPage() {
       <PageHeader title="Settings" description="Hub configuration." />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((i) => (
-          <Link key={i.href} href={i.href} className="rounded-lg border border-hairline bg-surface p-4 hover:border-navy">
+          <Link key={i.href} href={i.href} className="rounded-2xl border border-hairline bg-surface p-4 hover:border-hairline-strong">
             <p className="text-[14px] font-semibold text-ink">{i.title}</p>
             <p className="mt-1 text-[13px] text-muted">{i.text}</p>
           </Link>

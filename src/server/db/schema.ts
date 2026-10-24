@@ -106,6 +106,9 @@ export const taskStatus = pgEnum("task_status", ["open", "done", "cancelled"]);
 export const taskRecurrence = pgEnum("task_recurrence", ["none", "daily", "weekly", "monthly", "yearly"]);
 export const taskAssignRule = pgEnum("task_assign_rule", ["case_manager", "consultant", "unassigned"]);
 export const noteVisibility = pgEnum("note_visibility", ["internal", "client_visible"]);
+export const mirrorTruth = pgEnum("mirror_source_of_truth", ["airtable", "dashboard", "shared"]);
+export const mirrorRunStatus = pgEnum("mirror_run_status", ["running", "ok", "error"]);
+export const mirrorRunKind = pgEnum("mirror_run_kind", ["full", "incremental"]);
 export const eventKind = pgEnum("event_kind", ["consultation", "appointment", "biometrics", "interview", "submission", "meeting", "other"]);
 
 /* ───────────────────── Organisation ───────────────────── */
@@ -1283,4 +1286,95 @@ export const calendarEvents = pgTable(
     index("calendar_events_matter_idx").on(t.matterId),
     uniqueIndex("calendar_events_external_uq").on(t.orgId, t.externalSource, t.externalId),
   ],
+);
+
+/* ───────────────────── Airtable mirror (milestone 2) ───────────────────── */
+
+export type MirrorField = { id: string; name: string; type: string; computed: boolean; linkedTableId?: string | null; description?: string | null };
+
+/**
+ * One mirrored Airtable table. `firmId` null = a Hub dataset (Hub staff with
+ * mirror permissions only); otherwise the practice that owns the data.
+ */
+export const airtableSources = pgTable(
+  "airtable_sources",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    baseId: text("base_id").notNull(),
+    baseName: text("base_name").notNull(),
+    tableId: text("table_id").notNull(),
+    tableName: text("table_name").notNull(),
+    dataset: text("dataset").notNull(),
+    primaryFieldId: text("primary_field_id"),
+    fields: jsonb("fields").$type<MirrorField[]>().notNull().default([]),
+    /** Which system is authoritative for this dataset, and why. */
+    sourceOfTruth: mirrorTruth("source_of_truth").notNull().default("airtable"),
+    truthNote: text("truth_note"),
+    /** App entity this dataset corresponds to (e.g. "clients", "matters"), for reconciliation. */
+    mapsTo: text("maps_to"),
+    enabled: boolean("enabled").notNull().default(true),
+    position: integer("position").notNull().default(0),
+    /** Highest LAST_MODIFIED_TIME() seen, for incremental syncs. */
+    cursor: timestamp("cursor", { withTimezone: true }),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+    lastFullSyncAt: timestamp("last_full_sync_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    failures: integer("failures").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    sourceCount: integer("source_count"),
+    schemaCheckedAt: timestamp("schema_checked_at", { withTimezone: true }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("airtable_sources_table_uq").on(t.orgId, t.baseId, t.tableId)],
+);
+
+/** Mirrored records. Never deleted: a record missing from Airtable is marked removed (retention policy). */
+export const airtableRecords = pgTable(
+  "airtable_records",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    sourceId: uuid("source_id").notNull().references(() => airtableSources.id, { onDelete: "cascade" }),
+    recordId: text("record_id").notNull(),
+    /** Field values keyed by Airtable field id. */
+    fields: jsonb("fields").$type<Record<string, unknown>>().notNull().default({}),
+    primaryValue: text("primary_value"),
+    searchText: text("search_text"),
+    hash: text("hash").notNull(),
+    airtableCreatedAt: timestamp("airtable_created_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastChangedAt: timestamp("last_changed_at", { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("airtable_records_source_record_uq").on(t.sourceId, t.recordId), index("airtable_records_record_idx").on(t.orgId, t.recordId)],
+);
+
+export const airtableSyncRuns = pgTable(
+  "airtable_sync_runs",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    sourceId: uuid("source_id").notNull().references(() => airtableSources.id, { onDelete: "cascade" }),
+    kind: mirrorRunKind("kind").notNull(),
+    status: mirrorRunStatus("status").notNull().default("running"),
+    trigger: text("trigger").notNull(),
+    fetched: integer("fetched").notNull().default(0),
+    created: integer("created").notNull().default(0),
+    updated: integer("updated").notNull().default(0),
+    unchanged: integer("unchanged").notNull().default(0),
+    removed: integer("removed").notNull().default(0),
+    restored: integer("restored").notNull().default(0),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("airtable_sync_runs_source_idx").on(t.sourceId, t.startedAt)],
 );

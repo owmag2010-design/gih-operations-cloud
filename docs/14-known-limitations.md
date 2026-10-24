@@ -51,3 +51,6 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L41 | No deadline rules are pre-loaded | Calculated deadlines need a practice administrator to add and validate each rule with its source | By design: rules must come from the practice, not from the software |
 | L42 | Client-visible notes are only classified | There is no client portal yet to show them in | Client portal (Milestone 4) |
 | L43 | Matter checklists, documents and fees per matter aren't built | The matter shows the linked proposal only | Documents and finance (Milestone 3) |
+| L44 | The Airtable mirror is read-only | Changes must still be made in Airtable | Write-back design in docs/16-airtable-mirror.md |
+| L45 | The Airtable mirror needs `AIRTABLE_TOKEN` | Nothing is imported until a token is added in Vercel | Owen to create a read-only personal access token |
+| L46 | Airtable record search is a simple text match over field values | Fine for current volumes | Full-text index if tables grow large |

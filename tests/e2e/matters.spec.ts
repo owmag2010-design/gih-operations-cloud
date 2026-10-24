@@ -60,7 +60,7 @@ test("open a matter, record a fact, add a task and a note, and see it on the cal
   expect(await serious(page)).toEqual([]);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/matter.png`, fullPage: true });
 
-  for (const path of ["/tasks", "/calendar", "/matters", "/f/veritas/matters", "/f/veritas/settings/matters"]) {
+  for (const path of ["/tasks", "/calendar", "/matters", "/f/veritas/matters", "/f/veritas/settings/matters", "/airtable"]) {
     await page.goto(path);
     expect((await serious(page)).map((v) => `${path} ${v}`)).toEqual([]);
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/${path.replace(/\//g, "_")}.png`, fullPage: true });

@@ -9,7 +9,9 @@
 - My day now includes overdue tasks, reminders, matter deadlines in the next two weeks, and open matter counts per practice. New permissions: `matters:view_all`, `matters:view_assigned`, `matters:create`, `matters:edit`, `tasks:view_team`. Migrations 0016–0017.
 - Tests: 93 unit/integration and 12 end-to-end (including axe on the matter, tasks, calendar and matter settings pages).
 
-**Next (part 2):** Airtable read mirror and reconciliation.
+**Part 2: Airtable read mirror** (`src/server/modules/mirror`, docs/16-airtable-mirror.md): 30 tables across five bases registered from `data/config/airtable-sources.json`; full import and 15-minute incremental syncs by Airtable's modified time, full reconciliation every six hours; stable `rec…` ids, linked and reverse-linked records, calculated fields flagged, attachments opened through fresh links; last sync, errors, back-off and manual retry; reconciliation of counts, removed records (kept, never deleted), broken links and clients not yet in the dashboard; source of truth defined per dataset. Hub datasets need the new `mirror:view` permission; practice datasets stay within the practice. Read-only until write-back rules are agreed. Needs `AIRTABLE_TOKEN` to start importing. 96 unit/integration and 12 end-to-end tests pass.
+
+**Next:** Milestone 3: document drafting, template management, proposals, invoices and payment reconciliation.
 
 ## 24 Oct 2026: New interface ("Editorial Daylight")
 **Done:** Owen chose direction B from the three concepts. New top-bar shell with pill navigation and a mobile drawer; warm light palette; practice accent colours (Hub navy/red, Veritas magenta, Mimshac gold, Nextmove teal); per-person light / dark / match-device choice in the account menu (`users.ui_theme`, migration 0015); "My day" at `/today` as the landing page for everyone (greeting, what needs you, practice tiles, coming up), built only from records the person can access (`src/server/modules/today`). 81 unit/integration tests and 10 end-to-end tests (including axe in light and dark) pass.
