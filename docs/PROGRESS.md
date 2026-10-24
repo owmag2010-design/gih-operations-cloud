@@ -9,7 +9,7 @@
 - New permissions `invoices:view/edit/issue`, `payments:verify`. Migrations 0020–0021. Navigation: Proposals & Finance now opens the finance workspace.
 - Fixed: proposal and invoice PDFs lost page numbers and middle dots (react-pdf drops `render` text when the page sets `lineHeight`; the standard font has no "·").
 - Airtable mirror: the first sync of a dataset is now always a full import (a manual incremental sync with no cursor previously imported nothing). `AIRTABLE_TOKEN` is set in Vercel; Hub clients imported 147 records live.
-- Tests: 102 unit/integration and 13 end-to-end (finance flow with axe on every finance page).
+- Tests: 101 unit/integration and 13 end-to-end (finance flow with axe on every finance page).
 
 **Waiting on Owen:** Stripe test keys (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) in Vercel to switch card links on; billing details (registration, bank details, tax position) per practice in Billing settings.
 
