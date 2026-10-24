@@ -64,3 +64,10 @@ export const fullName = (first: string, last?: string | null) => (last ? `${firs
 export function formatMoney(minor: number, currency: string) {
   return new Intl.NumberFormat("en-ZA", { style: "currency", currency, maximumFractionDigits: minor % 100 === 0 ? 0 : 2 }).format(minor / 100);
 }
+
+export const CONSENT_PURPOSE: Record<string, string> = {
+  contact: "Contact",
+  data_processing: "Processing personal information",
+  marketing: "Marketing",
+  ai_assistance: "AI-assisted drafting",
+};

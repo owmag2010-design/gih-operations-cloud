@@ -169,6 +169,13 @@
       "when": 1792811162421,
       "tag": "0023_documents_security",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792813140345,
+      "tag": "0024_ai_safeguards",
+      "breakpoints": true
     }
   ]
 }

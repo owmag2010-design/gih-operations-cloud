@@ -12,7 +12,7 @@
 - Matter and client pages show their documents and files. Navigation: Documents & Templates opens the document workspace (email templates are a tab). New permissions `documents:view/edit/approve`, `document_templates:manage`. Migrations 0022–0023.
 - Tests: 108 unit/integration and 14 end-to-end (document flow including OCR upload, review, final, PDF and Word export, with axe).
 
-**Optional for Owen:** `ANTHROPIC_API_KEY` in Vercel to switch on AI drafting (decide first whether client records may be sent to Anthropic's API).
+**AI drafting safeguards (added after Owen set `ANTHROPIC_API_KEY`):** off per practice until an administrator switches it on; needs the client's recorded consent; children and facts marked sensitive never sent; names replaced by labels and restored. 109 unit/integration tests.
 
 **Next:** Milestone 4: team chat, client messaging, legal library, monitoring and content.
 

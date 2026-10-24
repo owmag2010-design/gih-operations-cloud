@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createInvitation, revokeInvitation } from "@/server/auth/service";
 import { toActionError, type ActionResult } from "@/server/errors";
-import { addClientNote, createClient, updateClient } from "@/server/modules/clients/clients";
+import { addClientNote, createClient, recordClientConsent, updateClient } from "@/server/modules/clients/clients";
+import { setAiDrafting } from "@/server/modules/documents/documents";
 import { addLeadNote, assignLeads, changeStage, convertLead, createLead, deleteLeads, markDuplicate, recordLeadConsent, updateLead } from "@/server/modules/crm/leads";
 import { createSavedView, deleteSavedView } from "@/server/modules/crm/views";
 import { addDepartment, addStage, moveStage, updateFirmPolicies, updateFirmProfile, updateStage } from "@/server/modules/org/firms";
@@ -422,6 +423,28 @@ export async function proposalStepAction(slug: string, id: string, step: Step, n
     }
     revalidatePath(`/f/${slug}/proposals`, "layout");
     return { ok: true, message, data };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+export async function recordClientConsentAction(slug: string, clientId: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    await recordClientConsent(ctx, firm.firmId, clientId, data(form));
+    revalidatePath(`/f/${slug}/clients/${clientId}`);
+    return { ok: true, message: "Consent recorded." };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+export async function setAiDraftingAction(slug: string, enabled: boolean): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    await setAiDrafting(ctx, firm.firmId, enabled);
+    revalidatePath(`/f/${slug}`, "layout");
+    return { ok: true, message: enabled ? "AI drafting switched on for this practice." : "AI drafting switched off for this practice." };
   } catch (err) {
     return toActionError(err);
   }

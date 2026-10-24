@@ -87,7 +87,7 @@ export const proposalStatus = pgEnum("proposal_status", [
   "declined",
   "withdrawn",
 ]);
-export const consentPurpose = pgEnum("consent_purpose", ["contact", "data_processing", "marketing"]);
+export const consentPurpose = pgEnum("consent_purpose", ["contact", "data_processing", "marketing", "ai_assistance"]);
 export const intakeStatus = pgEnum("intake_status", ["new", "routed", "held", "rejected", "duplicate"]);
 export const routingAction = pgEnum("routing_action", ["route", "hold", "consult"]);
 export const emailStatus = pgEnum("email_status", ["sent", "not_configured", "failed"]);
@@ -145,6 +145,10 @@ export const firms = pgTable(
     shareAggregateMetrics: boolean("share_aggregate_metrics").notNull().default(true),
     allowGroupAdminAccess: boolean("allow_group_admin_access").notNull().default(false),
     requireMfaForAll: boolean("require_mfa_for_all").notNull().default(false),
+    /** AI drafting assistance, off until a practice administrator switches it on. */
+    aiDraftingEnabled: boolean("ai_drafting_enabled").notNull().default(false),
+    aiDraftingChangedAt: timestamp("ai_drafting_changed_at", { withTimezone: true }),
+    aiDraftingChangedById: uuid("ai_drafting_changed_by_id"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -1098,6 +1102,8 @@ export const matterFacts = pgTable(
     value: text("value").notNull(),
     basis: factBasis("basis").notNull(),
     evidence: text("evidence"),
+    /** Health, criminal record, race, religion and similar: never sent to AI drafting. */
+    sensitive: boolean("sensitive").notNull().default(false),
     recordedById: uuid("recorded_by_id").references(() => users.id, { onDelete: "set null" }),
     verifiedById: uuid("verified_by_id").references(() => users.id, { onDelete: "set null" }),
     verifiedAt: timestamp("verified_at", { withTimezone: true }),

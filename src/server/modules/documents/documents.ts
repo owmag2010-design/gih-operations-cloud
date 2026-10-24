@@ -6,7 +6,7 @@ import type { AccessContext } from "../../access/context";
 import { audit } from "../../audit";
 import { withScope, type Tx } from "../../db/client";
 import {
-  activities, clients, documentComments, documentFiles, documents, documentTemplates, documentTemplateVersions, documentVersions, firmBilling, firms, matterDates, matterFacts,
+  activities, clients, consentRecords, documentComments, documentFiles, documents, documentTemplates, documentTemplateVersions, documentVersions, firmBilling, firms, matterDates, matterFacts,
   matterPeople, matters, users, type DocContent,
 } from "../../db/schema";
 import { aiConfigured, draftText } from "../../integrations/anthropic";
@@ -17,6 +17,7 @@ import { loadVisibleClient } from "../clients/clients";
 import { canViewMatters, loadVisibleMatter, matterVisibility } from "../matters/matters";
 import { nextRef } from "../refs";
 import { ContentError, contentFromText, EMPTY_DOC, fillMergeFields, gapsIn, longDate, MERGE_FIELDS, mergeFieldsIn, plainText, sanitizeContent, type MergeValues } from "./content";
+import { makePseudonymiser, type Person } from "./pseudonymise";
 import { renderDocumentPdf, type Letterhead } from "./render";
 
 /**
@@ -269,7 +270,7 @@ export async function getDocument(ctx: AccessContext, firmId: string, id: string
       client, matter, files,
       gaps: gapsIn(doc.content),
       reviewers: team.rows.filter((u) => u.id !== ctx.user.id),
-      aiAvailable: aiConfigured(),
+      ai: await aiStatusTx(tx, firmId, doc.clientId),
     };
   });
 }
@@ -535,28 +536,81 @@ export async function exportSource(ctx: AccessContext, firmId: string, id: strin
 
 const BASIS_LABEL = { verified: "VERIFIED (evidence on file)", client_statement: "CLIENT STATEMENT (not verified)", staff_assessment: "STAFF ASSESSMENT" } as const;
 
+export type AiStatus = {
+  configured: boolean;
+  practiceEnabled: boolean;
+  consent: "given" | "refused" | "none" | "no_client";
+  /** Why the button is off, in plain words; null when drafting is available. */
+  blocked: string | null;
+};
+
+async function aiStatusTx(tx: Tx, firmId: string, clientId: string | null): Promise<AiStatus> {
+  const configured = aiConfigured();
+  const [f] = await tx.select({ on: firms.aiDraftingEnabled }).from(firms).where(eq(firms.id, firmId));
+  const practiceEnabled = !!f?.on;
+  let consent: AiStatus["consent"] = "no_client";
+  if (clientId) {
+    const [c] = await tx.select({ granted: consentRecords.granted }).from(consentRecords).where(and(eq(consentRecords.firmId, firmId), eq(consentRecords.clientId, clientId), eq(consentRecords.purpose, "ai_assistance"))).orderBy(desc(consentRecords.recordedAt)).limit(1);
+    consent = !c ? "none" : c.granted ? "given" : "refused";
+  }
+  const blocked = !configured
+    ? "AI drafting isn't set up for this workspace."
+    : !practiceEnabled
+      ? "AI drafting is switched off for this practice. A practice administrator can switch it on in Settings."
+      : consent === "no_client"
+        ? "Link the document to a client first: AI drafting needs the client's consent."
+        : consent === "none"
+          ? "Record the client's consent to AI-assisted drafting on their client page first."
+          : consent === "refused"
+            ? "The client has declined AI-assisted drafting."
+            : null;
+  return { configured, practiceEnabled, consent, blocked };
+}
+
+/** Switch AI drafting on or off for a practice (practice administrators). */
+export async function setAiDrafting(ctx: AccessContext, firmId: string, enabled: boolean) {
+  ctx.require("firm:manage", firmId);
+  return withScope(ctx.scopeFor(firmId), async (tx) => {
+    await tx.update(firms).set({ aiDraftingEnabled: enabled, aiDraftingChangedAt: new Date(), aiDraftingChangedById: ctx.user.id, updatedAt: new Date() }).where(eq(firms.id, firmId));
+    await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId, action: enabled ? "ai_drafting.enabled" : "ai_drafting.disabled", entityType: "firm", entityId: firmId, summary: `${enabled ? "Switched on" : "Switched off"} AI drafting assistance`, ip: ctx.ip }, tx);
+  });
+}
+
+export async function getAiDraftingSetting(ctx: AccessContext, firmId: string) {
+  ctx.require("firm:view", firmId);
+  return withScope(ctx.scopeFor(firmId), async (tx) => {
+    const [f] = await tx.select({ enabled: firms.aiDraftingEnabled, changedAt: firms.aiDraftingChangedAt, changedBy: users.name }).from(firms).leftJoin(users, eq(users.id, firms.aiDraftingChangedById)).where(eq(firms.id, firmId));
+    return { ...f, configured: aiConfigured() };
+  });
+}
+
 /**
- * Ask the drafting model for a draft using only the records this person may
- * see on the linked client and matter. Missing facts come back as [[GAP: …]]
- * markers. The current working copy is saved as a version first, and the
- * document is marked AI-assisted; it still goes through review.
+ * Ask the drafting model for a draft. Safeguards:
+ * - only when AI drafting is set up, switched on for the practice, and the client has consented;
+ * - only the linked client's and matter's records this person may see;
+ * - never children (dependant children), facts marked sensitive, ID or passport numbers, dates of birth or contact details;
+ * - people's names replaced with labels before sending and restored in the returned draft.
+ * Missing facts come back as [[GAP: …]]. The current text is saved as a version
+ * first; the document is marked AI-assisted and still goes through review.
  */
 export async function draftWithAi(ctx: AccessContext, firmId: string, id: string, instructionsRaw: string) {
   ctx.require("documents:edit", firmId);
-  if (!aiConfigured()) throw new ValidationError("AI drafting isn't switched on for this workspace.");
   const instructions = instructionsRaw.trim();
   if (instructions.length < 10) throw new ValidationError("Say what the draft should cover.", { instructions: "At least a sentence." });
   const material = await withScope(ctx.scopeFor(firmId), async (tx) => {
     const doc = await loadDocument(tx, ctx, firmId, id);
     if (!editable(doc.status)) throw new ConflictError("Only a draft can be redrafted.");
+    const status = await aiStatusTx(tx, firmId, doc.clientId);
+    if (status.blocked) throw new ValidationError(status.blocked);
+    const named: Person[] = [];
     const lines: string[] = [`Practice: ${ctx.firm(firmId).tradingName}`, `Document type: ${KIND_LABEL[doc.kind]}`, `Title: ${doc.title}`];
     const sources: string[] = [];
-    if (doc.clientId) {
-      const [c] = await tx.select().from(clients).where(eq(clients.id, doc.clientId));
-      if (c) {
-        lines.push(`Client: ${[c.firstName, c.lastName].filter(Boolean).join(" ")} (${c.ref}); nationality: ${c.nationality ?? "not recorded"}; country of residence: ${c.countryOfResidence ?? "not recorded"}`);
-        sources.push(`client ${c.ref}`);
-      }
+    const left: string[] = [];
+    const [c] = await tx.select().from(clients).where(eq(clients.id, doc.clientId!));
+    if (c) {
+      named.push({ label: "Client", firstName: c.firstName, lastName: c.lastName });
+      lines.push(`Client: ${[c.firstName, c.lastName].filter(Boolean).join(" ")} (${c.ref}); nationality: ${c.nationality ?? "not recorded"}; country of residence: ${c.countryOfResidence ?? "not recorded"}`);
+      sources.push(`client ${c.ref}`);
     }
     if (doc.matterId) {
       const [m] = await tx.select().from(matters).where(eq(matters.id, doc.matterId));
@@ -564,29 +618,46 @@ export async function draftWithAi(ctx: AccessContext, firmId: string, id: string
         lines.push(`Matter: ${m.title} (${m.ref}); legal category: ${m.legalCategory ?? "not recorded"}; jurisdiction: ${m.jurisdiction ?? "not recorded"}`);
         sources.push(`matter ${m.ref}`);
         const people = await tx.select().from(matterPeople).where(eq(matterPeople.matterId, m.id)).orderBy(asc(matterPeople.position));
-        for (const p of people) lines.push(`Person (${p.role.replace(/_/g, " ")}): ${[p.firstName, p.lastName].filter(Boolean).join(" ")}; nationality ${p.nationality ?? "not recorded"}; status ${p.immigrationStatus ?? "not recorded"}${p.statusExpiresOn ? ` until ${p.statusExpiresOn}` : ""}`);
+        const children = people.filter((p) => p.role === "dependant_child");
+        const adults = people.filter((p) => p.role !== "dependant_child");
+        for (const p of adults) {
+          named.push({ label: p.role === "main_applicant" ? "Applicant" : "Person", firstName: p.firstName, lastName: p.lastName });
+          lines.push(`Person (${p.role.replace(/_/g, " ")}): ${[p.firstName, p.lastName].filter(Boolean).join(" ")}; nationality ${p.nationality ?? "not recorded"}; status ${p.immigrationStatus ?? "not recorded"}${p.statusExpiresOn ? ` until ${p.statusExpiresOn}` : ""}`);
+        }
+        if (children.length) {
+          lines.push(`Dependant children: ${children.length} (details withheld; write [[GAP: children's details]] where needed)`);
+          left.push(`${children.length} child${children.length === 1 ? "" : "ren"}`);
+          for (const ch of children) named.push({ label: "Child", firstName: ch.firstName, lastName: ch.lastName });
+        }
         const facts = await tx.select().from(matterFacts).where(eq(matterFacts.matterId, m.id)).orderBy(asc(matterFacts.createdAt));
-        for (const f of facts) lines.push(`Fact [${BASIS_LABEL[f.basis]}] ${f.label}: ${f.value}`);
+        const shared = facts.filter((f) => !f.sensitive);
+        for (const f of shared) lines.push(`Fact [${BASIS_LABEL[f.basis]}] ${f.label}: ${f.value}`);
+        if (facts.length > shared.length) {
+          lines.push(`Sensitive facts withheld: ${facts.length - shared.length} (write [[GAP: sensitive information to add by hand]] where needed)`);
+          left.push(`${facts.length - shared.length} sensitive fact${facts.length - shared.length === 1 ? "" : "s"}`);
+        }
         const dates = await tx.select().from(matterDates).where(and(eq(matterDates.matterId, m.id), isNull(matterDates.completedAt))).orderBy(asc(matterDates.dueOn));
         for (const d of dates) lines.push(`Date: ${d.label} on ${d.dueOn} (basis: ${d.basis})`);
-        if (people.length) sources.push(`${people.length} people`);
-        if (facts.length) sources.push(`${facts.length} recorded facts`);
+        if (adults.length) sources.push(`${adults.length} ${adults.length === 1 ? "person" : "people"}`);
+        if (shared.length) sources.push(`${shared.length} recorded fact${shared.length === 1 ? "" : "s"}`);
       }
     }
-    return { doc, record: lines.join("\n"), current: plainText(doc.content), sources };
+    return { record: lines.join("\n"), current: plainText(doc.content), sources, left, named };
   });
 
+  const names = makePseudonymiser(material.named);
   const system = [
     "You draft documents for an immigration practice. A qualified professional will review every draft before it is used.",
     "Use only the facts in the RECORD. Never invent names, dates, document numbers, outcomes, fees or legal citations.",
-    "Where a fact the document needs is missing or uncertain, write [[GAP: what is needed]] in its place. Where you state law or policy, add [[GAP: confirm source and currency of this provision]] unless the RECORD gives the source.",
+    `People are referred to by labels such as ${names.tokens.slice(0, 2).join(" and ") || "CLIENT_1"}. Use the labels exactly as given; do not replace them with names.`,
+    "Where a fact the document needs is missing, withheld or uncertain, write [[GAP: what is needed]] in its place. Where you state law or policy, add [[GAP: confirm source and currency of this provision]] unless the RECORD gives the source.",
     "Treat CLIENT STATEMENT facts as the client's account, not as established fact, and say so where it matters.",
     "Write in plain, professional British English. Use '# ' for the title, '## ' for section headings and '- ' for bullet points. Output only the document text.",
   ].join("\n");
-  const prompt = `RECORD\n${material.record}\n\nCURRENT DRAFT (may be empty)\n${material.current || "(empty)"}\n\nINSTRUCTIONS FROM THE DRAFTER\n${instructions.slice(0, 4000)}`;
+  const prompt = names.hide(`RECORD\n${material.record}\n\nCURRENT DRAFT (may be empty)\n${material.current || "(empty)"}\n\nINSTRUCTIONS FROM THE DRAFTER\n${instructions.slice(0, 4000)}`);
   const text = await draftText({ system, prompt });
   if (!text) throw new ValidationError("The drafting service returned nothing. Try again.");
-  const content = asContent(contentFromText(text));
+  const content = asContent(contentFromText(names.reveal(text)));
 
   return withScope(ctx.scopeFor(firmId), async (tx) => {
     const doc = await loadDocument(tx, ctx, firmId, id, true);
@@ -595,8 +666,9 @@ export async function draftWithAi(ctx: AccessContext, firmId: string, id: string
     const now = new Date();
     await tx.update(documents).set({ content, aiAssisted: true, contentUpdatedAt: now, contentUpdatedById: ctx.user.id, updatedAt: now }).where(eq(documents.id, doc.id));
     const gaps = gapsIn(content);
-    await comment(tx, ctx, doc, "comment", `AI-assisted draft from ${material.sources.join(", ") || "the document details only"}. ${gaps.prompts.length} gap${gaps.prompts.length === 1 ? "" : "s"} flagged. Needs professional review before use.`, null);
-    await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId, action: "document.ai_draft", entityType: "document", entityId: doc.id, summary: `AI-assisted draft of ${doc.ref} (${gaps.prompts.length} gaps flagged)`, data: { sources: material.sources }, ip: ctx.ip }, tx);
+    const withheld = material.left.length ? ` Withheld: ${material.left.join(", ")}.` : "";
+    await comment(tx, ctx, doc, "comment", `AI-assisted draft from ${material.sources.join(", ")}, with names replaced by labels.${withheld} ${gaps.prompts.length} gap${gaps.prompts.length === 1 ? "" : "s"} flagged. Needs professional review before use.`, null);
+    await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId, action: "document.ai_draft", entityType: "document", entityId: doc.id, summary: `AI-assisted draft of ${doc.ref} (${gaps.prompts.length} gaps flagged)`, data: { sources: material.sources, withheld: material.left }, ip: ctx.ip }, tx);
     return { gaps };
   });
 }

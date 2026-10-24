@@ -461,6 +461,7 @@ const factSchema = z.object({
   basis: z.enum(["client_statement", "staff_assessment", "verified"]),
   evidence: optionalText(500),
   personId: optionalUuid,
+  sensitive: z.union([z.boolean(), z.literal("on"), z.literal("true"), z.literal(""), z.literal("false")]).optional().transform((v) => v === true || v === "on" || v === "true"),
 });
 
 export async function addFact(ctx: AccessContext, firmId: string, matterId: string, raw: unknown) {
@@ -476,7 +477,7 @@ export async function addFact(ctx: AccessContext, firmId: string, matterId: stri
     const verified = input.basis === "verified";
     const [fact] = await tx
       .insert(matterFacts)
-      .values({ firmId, matterId: m.id, personId: input.personId ?? null, label: input.label, value: input.value, basis: input.basis, evidence: input.evidence ?? null, recordedById: ctx.user.id, verifiedById: verified ? ctx.user.id : null, verifiedAt: verified ? new Date() : null })
+      .values({ firmId, matterId: m.id, personId: input.personId ?? null, label: input.label, value: input.value, basis: input.basis, evidence: input.evidence ?? null, sensitive: input.sensitive, recordedById: ctx.user.id, verifiedById: verified ? ctx.user.id : null, verifiedAt: verified ? new Date() : null })
       .returning();
     await logActivity(tx, ctx, m, "fact", `${input.label}: recorded as ${input.basis.replace("_", " ")}`);
     return fact;

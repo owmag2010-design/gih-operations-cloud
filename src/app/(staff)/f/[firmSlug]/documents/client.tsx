@@ -282,17 +282,22 @@ export function ResolveCommentButton({ slug, id, commentId }: { slug: string; id
 
 /* ───────── AI drafting ───────── */
 
-export function AiDraftDialog({ slug, id, available }: { slug: string; id: string; available: boolean }) {
+export function AiDraftDialog({ slug, id, blocked }: { slug: string; id: string; blocked: string | null }) {
   const router = useRouter();
-  if (!available) {
-    return <Button variant="ghost" disabled title="Needs an Anthropic API key in the hosting settings"><Sparkles className="size-4" /> Draft with AI (not set up)</Button>;
+  if (blocked) {
+    return (
+      <span className="inline-flex items-center gap-2">
+        <Button variant="ghost" disabled aria-describedby="ai-blocked"><Sparkles className="size-4" /> Draft with AI</Button>
+        <span id="ai-blocked" className="max-w-xs text-xs text-muted">{blocked}</span>
+      </span>
+    );
   }
   return (
     <FormDialog
       trigger={<><Sparkles className="size-4" /> Draft with AI</>}
       triggerVariant="ghost"
       title="Draft with AI"
-      description="Uses only the linked client and matter records that you can see. Missing facts come back marked [[GAP: …]]. Your current text is saved as a version first. A professional must review the draft before use."
+      description="Uses only the linked client and matter records you can see, with names replaced by labels before anything is sent. Children's details and facts marked sensitive are never sent. Missing facts come back marked [[GAP: …]]. Your current text is saved as a version first, and a professional must review the draft before use."
       action={async (prev, form) => { const r = await aiDraftAction(slug, id, prev, form); if (r.ok) router.refresh(); return r; }}
       submit="Draft"
       pendingText="Drafting… this can take a minute"

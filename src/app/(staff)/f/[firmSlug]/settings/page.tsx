@@ -9,6 +9,9 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
 import { requireFirm } from "@/server/next/session";
+import { getAiDraftingSetting } from "@/server/modules/documents/documents";
+import { LocalTime } from "@/components/ui/forms";
+import { AiDraftingToggle } from "../consent-client";
 import { DepartmentForm, PoliciesForm, ProfileForm, StageEditor } from "./client";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -17,7 +20,7 @@ export default async function SettingsPage({ params }: PageProps<"/f/[firmSlug]/
   const { firmSlug } = await params;
   const { ctx, firm: access } = await requireFirm(firmSlug);
   const { firm, offices, departments } = await getFirmForSettings(ctx, access.firmId);
-  const [stages, services] = await Promise.all([listStages(ctx, firm.id, true), listCatalogue(ctx, firm.id)]);
+  const [stages, services, ai] = await Promise.all([listStages(ctx, firm.id, true), listCatalogue(ctx, firm.id), getAiDraftingSetting(ctx, firm.id)]);
   const canManage = ctx.has("firm:manage", firm.id);
   const canEditProfile = canManage || ctx.has("firms:edit");
   const canEditFees = ctx.has("services:manage", firm.id);
@@ -34,6 +37,25 @@ export default async function SettingsPage({ params }: PageProps<"/f/[firmSlug]/
             ) : (
               <Facts items={[["Legal name", firm.legalName], ["Trading name", firm.tradingName], ["Website", firm.website], ["Contact email", firm.contactEmail], ["Jurisdictions", firm.jurisdictions.map(countryName).join(", ")]]} />
             )}
+          </div>
+        </Panel>
+
+        <Panel id="ai">
+          <PanelHeader title="AI drafting assistance" description="Lets staff ask for a first draft of a document from the linked client and matter records. Off unless switched on here." />
+          <div className="flex flex-col gap-3 p-4 text-[13px]">
+            <p className="text-ink-2">
+              {!ai.configured ? "Not set up for this workspace yet (no API key). " : null}
+              Status: <strong className="text-ink">{ai.enabled ? "On" : "Off"}</strong>
+              {ai.changedAt ? <span className="text-muted"> · changed by {ai.changedBy ?? "an administrator"} <LocalTime value={ai.changedAt} mode="date" /></span> : null}
+            </p>
+            <ul className="list-disc pl-5 text-ink-2">
+              <li>Works only for clients whose consent to AI-assisted drafting is recorded on their client page.</li>
+              <li>Sends only the linked client&apos;s and matter&apos;s records to Anthropic&apos;s API (outside South Africa), with people&apos;s names replaced by labels.</li>
+              <li>Never sends children&apos;s details, facts marked sensitive, ID or passport numbers, dates of birth or contact details.</li>
+              <li>Every draft is marked AI-assisted, logged, and must be reviewed by a second person before it can be made final.</li>
+            </ul>
+            <p className="text-muted">Switching it on is the practice&apos;s decision under POPIA (operator agreement with Anthropic and the cross-border transfer basis).</p>
+            {canManage ? <div><AiDraftingToggle slug={firm.slug} enabled={!!ai.enabled} /></div> : null}
           </div>
         </Panel>
 

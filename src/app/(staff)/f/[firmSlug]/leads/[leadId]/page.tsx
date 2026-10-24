@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/ui/forms";
 import { Badge, Button, Facts, Notice, PageHeader, Panel, PanelHeader } from "@/components/ui/primitives";
 import { countryName } from "@/lib/countries";
-import { fullName, PRIORITY_LABELS, PRIORITY_TONE, SOURCE_LABELS, STAGE_TONE } from "@/lib/labels";
+import { CONSENT_PURPOSE, fullName, PRIORITY_LABELS, PRIORITY_TONE, SOURCE_LABELS, STAGE_TONE } from "@/lib/labels";
 import { NotFoundError } from "@/server/errors";
 import { getLead, listStages } from "@/server/modules/crm/leads";
 import { ComposeDialog } from "@/components/email/client";
@@ -136,7 +136,7 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/f/[
                 {consents.map((c) => (
                   <li key={c.id} className="px-4 py-2.5 text-[13px]">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-ink">{c.purpose === "contact" ? "Contact" : c.purpose === "data_processing" ? "Data processing" : "Marketing"}</span>
+                      <span className="text-ink">{CONSENT_PURPOSE[c.purpose] ?? c.purpose}</span>
                       <Badge tone={c.granted ? "ok" : "danger"}>{c.granted ? "Given" : "Refused"}</Badge>
                     </div>
                     <p className="text-xs text-muted">{c.method}, <LocalTime value={c.recordedAt} mode="date" /></p>

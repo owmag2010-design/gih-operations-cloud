@@ -57,7 +57,7 @@ export default async function DocumentPage({ params, searchParams }: PageProps<"
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {draft && canEdit ? <><SaveVersionDialog slug={firm.slug} id={d.id} /><SubmitDialog slug={firm.slug} id={d.id} reviewers={reviewers} gaps={gapCount} /><AiDraftDialog slug={firm.slug} id={d.id} available={v.aiAvailable} /></> : null}
+        {draft && canEdit ? <><SaveVersionDialog slug={firm.slug} id={d.id} /><SubmitDialog slug={firm.slug} id={d.id} reviewers={reviewers} gaps={gapCount} /><AiDraftDialog slug={firm.slug} id={d.id} blocked={v.ai.blocked} /></> : null}
         {d.status === "in_review" && canReview && !wroteIt ? <ReviewActions slug={firm.slug} id={d.id} /> : null}
         {(d.status === "in_review" || d.status === "approved") && canEdit ? <ReopenButton slug={firm.slug} id={d.id} approved={d.status === "approved"} /> : null}
         {d.status === "approved" && canEdit ? <FinaliseButton slug={firm.slug} id={d.id} /> : null}

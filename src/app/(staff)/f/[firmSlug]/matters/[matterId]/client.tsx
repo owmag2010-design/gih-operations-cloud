@@ -223,6 +223,7 @@ export function FactDialog({ slug, matterId, people, basisLabels }: { slug: stri
           ) : (
             <Field label="Source (optional)" name="evidence" idPrefix="fact"><Input maxLength={500} placeholder="e.g. Consultation call, 21 Oct" /></Field>
           )}
+          <Checkbox name="sensitive" label={<><span className="font-medium text-ink">Sensitive.</span> Health, criminal record, race, religion or similar. Never sent to AI drafting.</>} />
           <div className="flex justify-end"><SubmitButton>Record fact</SubmitButton></div>
         </form>
       </DialogContent>

@@ -36,10 +36,15 @@ PDF (A4) and Word (.docx), on the practice letterhead (name, legal name, registr
 - Extracted text is labelled machine-generated with the engine and confidence, and shown separately from the original.
 
 ## AI drafting assistance
-- Off until `ANTHROPIC_API_KEY` is set in the hosting settings (optional `ANTHROPIC_MODEL`). The button says "not set up" until then.
-- The draft is built only from the document's linked client and matter records the person may see: client details, matter details, people, facts **with their basis** (verified, client statement, staff assessment) and open key dates. Nothing from other matters, clients or practices is included.
-- The model is told not to invent facts or citations and to write `[[GAP: …]]` wherever something is missing or law needs confirming. The current text is saved as a version first; the document is marked "AI-assisted" and must go through review.
-- Using it sends those records to Anthropic's API; whether that is acceptable for each practice's clients (POPIA and client consent) is the practice's decision.
+Safeguards (all enforced on the server and tested):
+1. **Off per practice by default.** A practice administrator switches it on in Settings → AI drafting assistance; every change is logged.
+2. **Client consent.** Works only on documents linked to a client whose latest "AI-assisted drafting" consent record (client page → Consent → Record consent) says given. A later "declined or withdrawn" record stops it.
+3. **Data minimisation.** Only the linked client's and matter's records the person may see: client name, reference, nationality and residence; matter details; adults on the matter with nationality and status; facts **with their basis** (verified, client statement, staff assessment); open key dates. Never sent: dependant children (only a count), facts ticked **Sensitive** (health, criminal record, race, religion and similar; only a count), ID or passport numbers, dates of birth, contact details, or anything from other matters, clients or practices.
+4. **Names replaced by labels** (CLIENT_1, APPLICANT_2…) before anything is sent, including in the current draft and the instructions, and restored in the returned draft.
+
+The model is told not to invent facts or citations and to write `[[GAP: …]]` where something is missing or withheld. The current text is saved as a version first; the document is marked "AI-assisted", the comment records what was used and withheld, and it must be reviewed by a second person before it can be made final.
+
+Configuration: `ANTHROPIC_API_KEY` (added 24 Oct 2026), optional `ANTHROPIC_MODEL`. Anthropic's Commercial Terms prohibit training on customer content and incorporate its Data Processing Addendum; each practice decides whether that, with client consent, is its section 72 basis.
 
 ## Permissions
 | Permission | Consultant | Case manager | Reviewer | Document officer | Practice admin |

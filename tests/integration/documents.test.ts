@@ -10,10 +10,12 @@ import { convertLead, createLead } from "../../src/server/modules/crm/leads";
 import { fillMergeFields, gapsIn, mergeFieldsIn, plainText, sanitizeContent } from "../../src/server/modules/documents/content";
 import {
   addComment, approveDocument, autosaveDocument, createDocument, draftWithAi, duplicateDocument, exportSource, finaliseDocument, getDocument, getFile, listDocuments, listFiles,
-  listTemplates, reopenDocument, requestChanges, saveTemplate, saveVersion, submitForReview, uploadFile,
+  listTemplates, reopenDocument, requestChanges, saveTemplate, saveVersion, setAiDrafting, submitForReview, uploadFile,
 } from "../../src/server/modules/documents/documents";
+import { recordClientConsent } from "../../src/server/modules/clients/clients";
+import { makePseudonymiser } from "../../src/server/modules/documents/pseudonymise";
 import { renderDocumentDocx } from "../../src/server/modules/documents/render";
-import { addFact, createMatter } from "../../src/server/modules/matters/matters";
+import { addFact, createMatter, savePerson } from "../../src/server/modules/matters/matters";
 import { firmId, lead, makeUser, owner, resetDatabase } from "../support/fixtures";
 
 const para = (text: string) => ({ type: "paragraph", content: [{ type: "text", text }] });
@@ -55,6 +57,15 @@ describe("document content", () => {
     expect(plainText(content)).toContain("Dear Thandi,");
     expect(missing.sort()).toEqual(["client.shoeSize", "matter.ref"]);
     expect(gapsIn(content)).toEqual({ prompts: ["Write the body"], fields: ["matter.ref", "client.shoeSize"] });
+  });
+});
+
+describe("name labels for AI drafting", () => {
+  it("replaces whole names only and restores them", () => {
+    const p = makePseudonymiser([{ label: "Client", firstName: "Ann", lastName: "Lee" }, { label: "Applicant", firstName: "José", lastName: null }]);
+    const hidden = p.hide("Ann Lee and ann met José; Annabel and Leeds stay.");
+    expect(hidden).toBe("CLIENT_1 and CLIENT_1_FIRST met APPLICANT_2_FIRST; Annabel and Leeds stay.");
+    expect(p.reveal("CLIENT_1 thanked APPLICANT_2_FIRST and CLIENT_1_FIRST.")).toBe("Ann Lee thanked José and Ann.");
   });
 });
 
@@ -169,30 +180,53 @@ describe("documents", () => {
     expect((await getFile(consultant, veritas, pdf.id)).ocrStatus).toBe("unsupported");
   });
 
-  it("drafts with AI only from the linked matter's records and flags gaps", async () => {
-    const { veritas, consultant, client, matter } = await setup();
+  it("drafts with AI only when switched on and consented, without children, sensitive facts or real names", async () => {
+    const { veritas, admin, consultant, client, matter } = await setup();
     const other = await createMatter(consultant, veritas, { clientId: client.id, title: "Other matter" });
     await addFact(consultant, veritas, matter.id, { label: "Married since", value: "2019", basis: "client_statement" });
+    await addFact(consultant, veritas, matter.id, { label: "Medical report", value: "chronic-condition-xyz", basis: "verified", evidence: "Doctor's letter", sensitive: "on" });
     await addFact(consultant, veritas, other.id, { label: "Unrelated secret", value: "do-not-leak", basis: "client_statement" });
+    await savePerson(consultant, veritas, matter.id, null, { role: "dependant_child", firstName: "Kiddo", lastName: "Mokoena" });
     const { document: d } = await createDocument(consultant, veritas, { title: "Consultation report", kind: "consultation_report", matterId: matter.id });
-    await expect(draftWithAi(consultant, veritas, d.id, "Draft the consultation report.")).rejects.toBeInstanceOf(ValidationError); // not switched on
 
     let seen = "";
     __setDrafterTestDouble(async ({ prompt, system }) => {
       seen = `${system}\n${prompt}`;
-      return "# Consultation report\n## Background\nThe client says they married in 2019.\n- Marriage certificate: [[GAP: certificate not on file]]";
+      return "# Consultation report\n## Background\nCLIENT_1 says CLIENT_1_FIRST married in 2019.\n- Marriage certificate: [[GAP: certificate not on file]]";
     });
-    await autosaveDocument(consultant, veritas, d.id, { content: doc("My notes") });
-    const r = await draftWithAi(consultant, veritas, d.id, "Draft the consultation report from the record.");
+    const blocked = async (msg: RegExp) => {
+      const e = await draftWithAi(consultant, veritas, d.id, "Draft the consultation report.").catch((x) => x);
+      expect(e).toBeInstanceOf(ValidationError);
+      expect((e as Error).message).toMatch(msg);
+    };
+    await blocked(/switched off for this practice/);
+    await expect(setAiDrafting(consultant, veritas, true)).rejects.toBeInstanceOf(AccessDeniedError);
+    await setAiDrafting(admin, veritas, true);
+    await blocked(/Record the client's consent/);
+    await recordClientConsent(consultant, veritas, client.id, { purpose: "ai_assistance", granted: "no", method: "Email 24 Oct" });
+    await blocked(/declined/);
+    await recordClientConsent(consultant, veritas, client.id, { purpose: "ai_assistance", granted: "yes", method: "Engagement letter clause 9" });
+    expect(seen).toBe("");
+
+    await autosaveDocument(consultant, veritas, d.id, { content: doc("My notes about Thandi Mokoena") });
+    const r = await draftWithAi(consultant, veritas, d.id, "Draft the consultation report for Thandi from the record.");
     expect(seen).toContain("CLIENT STATEMENT (not verified)] Married since: 2019");
-    expect(seen).not.toContain("do-not-leak");
+    expect(seen).toContain("Dependant children: 1 (details withheld");
+    expect(seen).toContain("Sensitive facts withheld: 1");
+    for (const secret of ["do-not-leak", "chronic-condition-xyz", "Kiddo", "Thandi", "Mokoena"]) expect(seen).not.toContain(secret);
+    expect(seen).toContain("CLIENT_1");
     expect(r.gaps.prompts).toEqual(["GAP: certificate not on file"]);
     const view = await getDocument(consultant, veritas, d.id);
+    expect(plainText(view.document.content)).toContain("Thandi Mokoena says Thandi married in 2019.");
     expect(view.document.aiAssisted).toBe(true);
     expect(view.versions.map((v) => v.note)).toEqual(["Before AI-assisted draft"]);
-    expect(view.comments.at(-1)?.body).toMatch(/AI-assisted draft .* Needs professional review/);
+    expect(view.comments.at(-1)?.body).toMatch(/names replaced by labels\. Withheld: 1 child, 1 sensitive fact\. 1 gap flagged\. Needs professional review/);
     await addComment(consultant, veritas, d.id, "Will check the certificate.");
     const [row] = await owner.select().from(s.documents).where(and(eq(s.documents.id, d.id)));
     expect(row.aiAssisted).toBe(true);
+
+    // Switching it off stops it again.
+    await setAiDrafting(admin, veritas, false);
+    await blocked(/switched off/);
   });
 });

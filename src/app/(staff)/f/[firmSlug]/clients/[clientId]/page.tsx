@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/ui/forms";
 import { Badge, Button, Facts, Notice, PageHeader, Panel, PanelHeader } from "@/components/ui/primitives";
 import { countryName } from "@/lib/countries";
-import { fullName } from "@/lib/labels";
+import { CONSENT_PURPOSE, fullName } from "@/lib/labels";
 import { NotFoundError } from "@/server/errors";
 import { getClient } from "@/server/modules/clients/clients";
 import { mattersForClient } from "@/server/modules/matters/matters";
@@ -13,6 +13,7 @@ import { NotesPanel } from "@/components/work/notes";
 import { Lock } from "lucide-react";
 import { ComposeDialog } from "@/components/email/client";
 import { requireFirm } from "@/server/next/session";
+import { ClientConsentDialog } from "../../consent-client";
 import { DocumentsPanel } from "../../documents/matter-panel";
 import { Timeline } from "../../timeline";
 
@@ -109,13 +110,13 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/f
             </div>
           </Panel>
           <Panel>
-            <PanelHeader title="Consent" />
+            <PanelHeader title="Consent" actions={ctx.has("clients:edit", firm.firmId) ? <ClientConsentDialog slug={firm.slug} clientId={client.id} purposes={Object.entries(CONSENT_PURPOSE)} /> : null} />
             {consents.length === 0 ? <p className="p-4 text-[13px] text-muted">No consent recorded.</p> : (
               <ul className="divide-y divide-hairline">
                 {consents.map((c) => (
                   <li key={c.id} className="px-4 py-2.5 text-[13px]">
-                    <div className="flex items-center justify-between"><span className="capitalize">{c.purpose.replace("_", " ")}</span><Badge tone={c.granted ? "ok" : "danger"}>{c.granted ? "Given" : "Refused"}</Badge></div>
-                    <p className="text-xs text-muted">{c.method}</p>
+                    <div className="flex items-center justify-between"><span>{CONSENT_PURPOSE[c.purpose] ?? c.purpose}</span><Badge tone={c.granted ? "ok" : "danger"}>{c.granted ? "Given" : "Refused"}</Badge></div>
+                    <p className="text-xs text-muted">{c.method} · <LocalTime value={c.recordedAt} mode="date" /></p>
                   </li>
                 ))}
               </ul>

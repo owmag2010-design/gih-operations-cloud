@@ -168,3 +168,23 @@ export async function exportClientsCsv(ctx: AccessContext, firmId: string, f: Cl
   await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId, action: "client.exported", entityType: "client", summary: `Exported ${rows.length} client(s) to CSV`, data: { count: rows.length }, ip: ctx.ip });
   return csv;
 }
+
+/** Record a client's consent (or refusal) for a purpose, with how it was given. The latest record for a purpose applies. */
+export async function recordClientConsent(ctx: AccessContext, firmId: string, clientId: string, raw: unknown) {
+  ctx.require("clients:edit", firmId);
+  const input = parseOrThrow(
+    z.object({
+      purpose: z.enum(["contact", "data_processing", "marketing", "ai_assistance"]),
+      granted: z.union([z.literal("yes"), z.literal("no")]).transform((v) => v === "yes"),
+      method: z.string().trim().min(2, "Say how consent was given.").max(120),
+      evidence: optionalText(500),
+    }),
+    raw,
+  );
+  return withScope(ctx.scopeFor(firmId), async (tx) => {
+    const client = await loadVisibleClient(tx, ctx, firmId, clientId);
+    await tx.insert(consentRecords).values({ firmId, clientId: client.id, purpose: input.purpose, granted: input.granted, method: input.method, evidence: input.evidence, recordedById: ctx.user.id });
+    await tx.insert(activities).values({ firmId, clientId: client.id, type: "consent", actorId: ctx.user.id, data: { purpose: input.purpose, granted: input.granted } });
+    await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId, action: "client.consent_recorded", entityType: "client", entityId: client.id, data: { purpose: input.purpose, granted: input.granted }, ip: ctx.ip }, tx);
+  });
+}

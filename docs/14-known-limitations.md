@@ -75,10 +75,12 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L55 | Scanned PDFs without a text layer aren't OCR'd | Marked "upload pages as images" | Rasterise PDF pages server-side for OCR |
 | L56 | OCR reads English only | Other languages come out poorly | Add language packs when needed |
 | L57 | Uploaded files are stored in PostgreSQL, up to 4 MB each | Large scans must be split or compressed | Object storage with direct uploads |
-| L58 | AI drafting needs `ANTHROPIC_API_KEY` and sends the linked records to Anthropic's API | Off until the key is added; a data-sharing decision for each practice | Owen decides; add a per-practice switch if practices differ |
+| L58 | AI drafting sends the linked (minimised, name-labelled) records to Anthropic's API outside South Africa | Each practice must switch it on and record client consent first | Done: per-practice switch, consent check, minimisation and name labels (24 Oct 2026) |
 | L59 | No simultaneous co-editing; a second editor's save is refused instead of merged | Two people shouldn't edit the same draft at once | Real-time collaboration if needed |
 | L60 | The editor has no tables or images; the letterhead is text (name, details, colour), not the logo image | Tables must be lists for now | Tables and logo images in exports |
 | L61 | Starter templates are structure only | Each practice must write its own wording | By design: wording comes from the practice |
 | L62 | No tracked changes; review is by comments and versions | Reviewers can't redline inside the text | Suggestion mode in the editor |
 | L63 | No e-signature on final documents | Sign outside the app | DocuSign or similar |
 | L64 | OCR runs during the upload request (up to 60 seconds) | Large or complex images can time out and show "Couldn't read" with Read again | Background job queue |
+| L65 | Name labels cover people's names on the client and matter only; a name typed into free text that isn't recorded on the matter (e.g. an employer's director) is sent as written | Small residual exposure in free-text facts | Staff keep identifying details of third parties out of facts, or mark them sensitive |
+| L66 | "Sensitive" on a fact is ticked by staff, not detected automatically | A sensitive fact not ticked would be sent | Prompt reviewers; consider automatic detection later |

@@ -149,7 +149,7 @@ export default async function MatterPage({ params, searchParams }: PageProps<"/f
                   <li key={f.id} className="flex flex-wrap items-start gap-3 px-4 py-3">
                     <Badge tone={BASIS_TONE[f.basis]} className="mt-0.5 w-[120px] justify-center">{FACT_BASIS[f.basis]}</Badge>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] text-muted">{f.label}{nameOfPerson(f.personId) ? ` · ${nameOfPerson(f.personId)}` : ""}</p>
+                      <p className="text-[13px] text-muted">{f.label}{nameOfPerson(f.personId) ? ` · ${nameOfPerson(f.personId)}` : ""}{f.sensitive ? <Badge tone="warn" className="ml-2">Sensitive</Badge> : null}</p>
                       <p className="text-sm whitespace-pre-wrap text-ink">{f.value}</p>
                       <p className="mt-0.5 text-xs text-muted">
                         {f.basis === "verified" ? <>Verified against {f.evidence} by {f.verifiedBy ?? "unknown"}{f.verifiedAt ? <> · <LocalTime value={f.verifiedAt} mode="date" /></> : null}</> : <>Recorded by {f.recordedBy ?? "unknown"}{f.evidence ? ` · ${f.evidence}` : ""}</>}
