@@ -10,8 +10,8 @@ import type { ProposalSnapshot } from "../../db/schema";
 type Brand = { ink: string; accent: string; accent2: string; paper: string; cover: string; coverText: string; kicker: string; bar: boolean };
 
 const BRANDS: Record<string, Brand> = {
-  veritas: { ink: "#1d1b1a", accent: "#9e1f63", accent2: "#e6a930", paper: "#faf7f4", cover: "#0f0f0f", coverText: "#faf7f4", kicker: "CORPORATE · PRIVATE WEALTH · MIGRATION", bar: false },
-  mimshac: { ink: "#272525", accent: "#e6a930", accent2: "#e6a930", paper: "#ffffff", cover: "#272525", coverText: "#ffffff", kicker: "IMMIGRATION · LEGAL · GLOBAL MOBILITY", bar: true },
+  veritas: { ink: "#1d1b1a", accent: "#9e1f63", accent2: "#e6a930", paper: "#faf7f4", cover: "#0f0f0f", coverText: "#faf7f4", kicker: "CORPORATE | PRIVATE WEALTH | MIGRATION", bar: false },
+  mimshac: { ink: "#272525", accent: "#e6a930", accent2: "#e6a930", paper: "#ffffff", cover: "#272525", coverText: "#ffffff", kicker: "IMMIGRATION | LEGAL | GLOBAL MOBILITY", bar: true },
 };
 
 function brandFor(s: ProposalSnapshot): Brand {
@@ -24,7 +24,8 @@ const longDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { da
 
 function styles(b: Brand) {
   return StyleSheet.create({
-    page: { backgroundColor: b.paper, color: b.ink, fontFamily: "Helvetica", fontSize: 10, lineHeight: 1.5, paddingTop: 56, paddingBottom: 64, paddingHorizontal: 56 },
+    // No lineHeight on the page: with it, react-pdf 4.x drops the page numbers.
+    page: { backgroundColor: b.paper, color: b.ink, fontFamily: "Helvetica", fontSize: 10, paddingTop: 56, paddingBottom: 64, paddingHorizontal: 56 },
     cover: { backgroundColor: b.cover, color: b.coverText, padding: 0, fontFamily: "Helvetica" },
     coverBar: { position: "absolute", left: 0, top: 0, bottom: 0, width: 14, backgroundColor: b.accent },
     coverInner: { flex: 1, paddingHorizontal: 64, paddingTop: 72, paddingBottom: 56, justifyContent: "space-between" },
@@ -38,7 +39,7 @@ function styles(b: Brand) {
     stripValue: { fontSize: 10, marginTop: 3 },
     h2kicker: { fontSize: 7.5, letterSpacing: 1.8, color: b.accent, marginBottom: 4 },
     h2: { fontFamily: "Times-Roman", fontSize: 20, marginBottom: 10 },
-    body: { fontSize: 10, marginBottom: 6 },
+    body: { fontSize: 10, lineHeight: 1.5, marginBottom: 6 },
     section: { marginBottom: 22 },
     table: { borderTopWidth: 1, borderTopColor: b.ink, marginTop: 4 },
     row: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: "#d9d4ce", paddingVertical: 7 },
@@ -56,8 +57,8 @@ function styles(b: Brand) {
 function Footer({ s, st, b }: { s: ProposalSnapshot; st: ReturnType<typeof styles>; b: Brand }) {
   return (
     <View style={st.footer} fixed>
-      <Text>{s.firm.tradingName} · A partner firm of Global Immigration Hub{s.firm.contactEmail ? ` · ${s.firm.contactEmail}` : ""}</Text>
-      <Text render={({ pageNumber, totalPages }) => `${s.ref} v${s.version} · ${pageNumber} / ${totalPages}`} style={{ color: b.accent }} />
+      <Text>{s.firm.tradingName} | A partner firm of Global Immigration Hub{s.firm.contactEmail ? ` | ${s.firm.contactEmail}` : ""}</Text>
+      <Text render={({ pageNumber, totalPages }) => `${s.ref} v${s.version} | ${pageNumber} / ${totalPages}`} style={{ color: b.accent }} />
     </View>
   );
 }
@@ -87,7 +88,7 @@ export function ProposalDocument({ s, draft }: { s: ProposalSnapshot; draft?: bo
             <Text style={st.kicker}>{b.kicker}</Text>
           </View>
           <View>
-            <Text style={{ fontSize: 8, letterSpacing: 2, color: b.accent2 }}>{draft ? "DRAFT · NOT SENT" : "PROPOSAL"}</Text>
+            <Text style={{ fontSize: 8, letterSpacing: 2, color: b.accent2 }}>{draft ? "DRAFT | NOT SENT" : "PROPOSAL"}</Text>
             <View style={st.rule} />
             <Text style={st.coverTitle}>{s.title}</Text>
             <Text style={st.coverLede}>Prepared for {s.recipientName}. How we will handle your matter, what it costs, and how to begin.</Text>
@@ -96,7 +97,7 @@ export function ProposalDocument({ s, draft }: { s: ProposalSnapshot; draft?: bo
             <View style={st.strip}>
               {[
                 ["PREPARED FOR", s.recipientName],
-                ["REFERENCE", `${s.ref} · v${s.version}`],
+                ["REFERENCE", `${s.ref} | v${s.version}`],
                 ["DATE", longDate(s.releasedAt)],
                 ["VALID UNTIL", longDate(s.validUntil)],
               ].map(([k, v]) => (
@@ -106,7 +107,7 @@ export function ProposalDocument({ s, draft }: { s: ProposalSnapshot; draft?: bo
                 </View>
               ))}
             </View>
-            <Text style={{ fontSize: 7.5, marginTop: 14, opacity: 0.7 }}>A partner firm of Global Immigration Hub{s.preparedBy ? ` · Prepared by ${s.preparedBy}` : ""}</Text>
+            <Text style={{ fontSize: 7.5, marginTop: 14, opacity: 0.7 }}>A partner firm of Global Immigration Hub{s.preparedBy ? ` | Prepared by ${s.preparedBy}` : ""}</Text>
           </View>
         </View>
       </Page>
@@ -169,7 +170,7 @@ export function ProposalDocument({ s, draft }: { s: ProposalSnapshot; draft?: bo
           {s.firm.contactEmail ? <Text>{s.firm.contactEmail}</Text> : null}
           {s.firm.contactPhone ? <Text>{s.firm.contactPhone}</Text> : null}
           {s.firm.website ? <Text>{s.firm.website}</Text> : null}
-          <Text style={[st.muted, { marginTop: 6 }]}>Global Immigration Hub centres: Pretoria (115 Paul Kruger Street, New Court Chambers) · Harare (Office 2, 12th Floor, Joina City)</Text>
+          <Text style={[st.muted, { marginTop: 6 }]}>Global Immigration Hub centres: Pretoria (115 Paul Kruger Street, New Court Chambers) | Harare (Office 2, 12th Floor, Joina City)</Text>
         </View>
         <Footer s={s} st={st} b={b} />
       </Page>

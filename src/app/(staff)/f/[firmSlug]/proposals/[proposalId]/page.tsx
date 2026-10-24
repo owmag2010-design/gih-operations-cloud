@@ -5,10 +5,13 @@ import { LocalTime } from "@/components/ui/forms";
 import { Badge, Button, Facts, Notice, PageHeader, Panel, PanelHeader } from "@/components/ui/primitives";
 import { formatMoney, fullName } from "@/lib/labels";
 import { NotFoundError } from "@/server/errors";
+import { proposalInvoices } from "@/server/modules/finance/finance";
 import { getProposal, statusLabel } from "@/server/modules/proposals/proposals";
 import { listCatalogue } from "@/server/modules/services/services";
 import { requireFirm } from "@/server/next/session";
 import { DetailsEditor, ItemsEditor, WorkflowBar } from "../client";
+import { ProposalInvoiceButtons } from "../../finance/client";
+import { INVOICE_STATUS } from "../../finance/labels";
 import { PROPOSAL_TONE } from "../labels";
 
 export const metadata: Metadata = { title: "Proposal" };
@@ -24,6 +27,7 @@ export default async function ProposalPage({ params }: PageProps<"/f/[firmSlug]/
   const editable = ctx.has("proposals:edit", firm.firmId) && (p.status === "draft" || p.status === "changes_requested");
   const services = editable ? (await listCatalogue(ctx, firm.firmId, { activeOnly: true })).map((s) => ({ id: s.id, name: s.name, category: s.category, total: formatMoney(s.totalMinor, s.currency) })) : [];
   const released = versions.find((v) => v.version === p.version);
+  const invoicesForProposal = p.status === "accepted" && ctx.has("invoices:view", firm.firmId) ? await proposalInvoices(ctx, firm.firmId, p.id) : [];
 
   return (
     <>
@@ -41,6 +45,25 @@ export default async function ProposalPage({ params }: PageProps<"/f/[firmSlug]/
       />
       {p.status === "changes_requested" && p.reviewNote ? <Notice tone="warn" className="mb-4"><strong>Changes requested:</strong> {p.reviewNote}</Notice> : null}
       {p.status === "accepted" ? <Notice tone="ok" className="mb-4">Accepted by {p.responseName} on <LocalTime value={p.respondedAt} />. {lead?.convertedClientId ? (ctx.has("matters:create", firm.firmId) ? <>Next: <Link className="underline" href={`${base}/matters/new?client=${lead.convertedClientId}&proposal=${p.id}`}>open the matter</Link>.</> : "The lead is already a client.") : <>Next: <Link className="underline" href={`${base}/leads/${lead?.id}`}>convert the lead to a client</Link> once the deposit is paid, then open the matter.</>}</Notice> : null}
+      {p.status === "accepted" && ctx.has("invoices:view", firm.firmId) ? (
+        <Panel className="mb-4">
+          <PanelHeader
+            title="Invoices"
+            description={lead?.convertedClientId ? "Raise the deposit and balance (or the full amount) at the accepted fees. Each invoice starts as a draft." : "Convert the lead to a client before invoicing."}
+            actions={lead?.convertedClientId && ctx.has("invoices:edit", firm.firmId) ? <ProposalInvoiceButtons slug={firm.slug} proposalId={p.id} hasDeposit={p.depositMinor > 0} existing={invoicesForProposal.map((i) => i.part).filter((x): x is string => !!x)} /> : null}
+          />
+          {invoicesForProposal.length ? (
+            <ul className="divide-y divide-hairline text-[13px]">
+              {invoicesForProposal.map((i) => (
+                <li key={i.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                  <Link href={`${base}/finance/invoices/${i.id}`} className="num underline-offset-2 hover:underline">{i.number ?? "Draft"}{i.part ? <span className="ml-2 text-muted">{i.part}</span> : null}</Link>
+                  <span className="flex items-center gap-3"><Badge tone={(INVOICE_STATUS[i.display] ?? INVOICE_STATUS.draft).tone}>{(INVOICE_STATUS[i.display] ?? INVOICE_STATUS.draft).label}</Badge><span className="num">{formatMoney(i.totalMinor, i.currency)}</span></span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </Panel>
+      ) : null}
       {p.status === "declined" ? <Notice tone="danger" className="mb-4">Declined by {p.responseName}{p.responseNote ? `: “${p.responseNote}”` : "."} You can start a new version.</Notice> : null}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">

@@ -1,4 +1,4 @@
-/** Reset the e2e database, seed configuration and create two firm consultants with known passwords. */
+/** Reset the e2e database, seed configuration and create two firm consultants and a finance officer with known passwords. */
 import { hash } from "@node-rs/argon2";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -26,6 +26,10 @@ export default async function setup() {
     const [u] = await db.insert(s.users).values({ orgId: org.id, email, name, passwordHash, status: "active", kind: "staff" }).returning();
     await db.insert(s.firmMemberships).values({ firmId: firm.id, userId: u.id, roleId: consultant.id });
   }
+  const [financeRole] = await db.select().from(s.roles).where(eq(s.roles.key, "finance_officer"));
+  const [veritas] = await db.select().from(s.firms).where(eq(s.firms.slug, "veritas"));
+  const [fo] = await db.insert(s.users).values({ orgId: org.id, email: "finance.e2e@example.test", name: "Fin Officer", passwordHash, status: "active", kind: "staff" }).returning();
+  await db.insert(s.firmMemberships).values({ firmId: veritas.id, userId: fo.id, roleId: financeRole.id });
   await pool.end();
   writeFileSync("tests/e2e/.state.json", JSON.stringify({ password: PASSWORD }));
 }

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AccessContext } from "../../access/context";
 import { audit } from "../../audit";
@@ -98,10 +98,17 @@ async function addServiceItem(tx: Tx, firmId: string, proposalId: string, servic
 
 /* ───────────────────────── Reading ───────────────────────── */
 
+/** A sent proposal whose client link has passed its validity date shows as expired; the client can no longer accept it. */
+export function isExpired(p: { status: string; linkExpiresAt: Date | null }) {
+  return p.status === "released" && !!p.linkExpiresAt && p.linkExpiresAt.getTime() < Date.now();
+}
+
 export async function listProposals(ctx: AccessContext, firmId: string, f: { status?: string; leadId?: string } = {}) {
   ctx.require("proposals:view", firmId);
   const conds = [eq(proposals.firmId, firmId), ...leadVisibility(ctx, firmId)];
   if (f.status === "open") conds.push(inArray(proposals.status, OPEN_STATUSES));
+  else if (f.status === "expired") conds.push(eq(proposals.status, "released"), lt(proposals.linkExpiresAt, new Date()));
+  else if (f.status === "released") conds.push(eq(proposals.status, "released"), or(isNull(proposals.linkExpiresAt), gte(proposals.linkExpiresAt, new Date()))!);
   else if (f.status && f.status in { draft: 1, in_review: 1, changes_requested: 1, approved: 1, released: 1, accepted: 1, declined: 1, withdrawn: 1 }) conds.push(eq(proposals.status, f.status as ProposalStatus));
   if (f.leadId && uuid.safeParse(f.leadId).success) conds.push(eq(proposals.leadId, f.leadId));
   return withScope(ctx.scopeFor(firmId), async (tx) => {
@@ -109,7 +116,7 @@ export async function listProposals(ctx: AccessContext, firmId: string, f: { sta
       .select({
         id: proposals.id, ref: proposals.ref, title: proposals.title, status: proposals.status, version: proposals.version,
         recipientName: proposals.recipientName, currency: proposals.currency, totalMinor: proposals.totalMinor, updatedAt: proposals.updatedAt,
-        leadId: proposals.leadId, leadRef: leads.ref, ownerName: users.name,
+        leadId: proposals.leadId, leadRef: leads.ref, ownerName: users.name, linkExpiresAt: proposals.linkExpiresAt,
       })
       .from(proposals)
       .innerJoin(leads, eq(leads.id, proposals.leadId))
@@ -123,7 +130,15 @@ export async function listProposals(ctx: AccessContext, firmId: string, f: { sta
       .innerJoin(leads, eq(leads.id, proposals.leadId))
       .where(and(eq(proposals.firmId, firmId), ...leadVisibility(ctx, firmId)))
       .groupBy(proposals.status);
-    return { rows, counts: Object.fromEntries(counts.map((c) => [c.status, c.n])) as Partial<Record<ProposalStatus, number>> };
+    const [{ expired }] = await tx
+      .select({ expired: count() })
+      .from(proposals)
+      .innerJoin(leads, eq(leads.id, proposals.leadId))
+      .where(and(eq(proposals.firmId, firmId), ...leadVisibility(ctx, firmId), eq(proposals.status, "released"), lt(proposals.linkExpiresAt, new Date())));
+    const byStatus = Object.fromEntries(counts.map((c) => [c.status, Number(c.n)])) as Partial<Record<ProposalStatus | "expired", number>>;
+    if (byStatus.released) byStatus.released -= Number(expired);
+    byStatus.expired = Number(expired);
+    return { rows: rows.map((r) => ({ ...r, expired: isExpired(r) })), counts: byStatus };
   });
 }
 

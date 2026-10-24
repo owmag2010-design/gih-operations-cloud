@@ -149,6 +149,10 @@ describe("proposals", () => {
     await owner.update(s.proposals).set({ linkExpiresAt: new Date(Date.now() - 1000) }).where(eq(s.proposals.id, p.id));
     expect((await getPublicProposal(tokenOf(url)))?.expired).toBe(true);
     expect(await respondToProposal(tokenOf(url), { accept: true, name: "Thandi", ip: null })).toBe("expired");
+    const expiredList = await listProposals(admin, veritas, { status: "expired" });
+    expect(expiredList.rows.map((r) => [r.id, r.expired])).toEqual([[p.id, true]]);
+    expect(expiredList.counts).toMatchObject({ expired: 1, released: 0 });
+    expect((await listProposals(admin, veritas, { status: "released" })).rows).toHaveLength(0);
 
     const renewed = await renewLink(admin, veritas, p.id, 7);
     expect(await getPublicProposal(tokenOf(url))).toBeNull(); // old link dead

@@ -1,5 +1,20 @@
 # Progress Log
 
+## 24 Oct 2026: Milestone 3 (part 1): invoices, payments and reconciliation
+**Done (tested):**
+- **Invoices** per practice (`src/server/modules/finance`, docs/17-finance.md): drafts with line types (professional, government, third-party, disbursement, discount), quantities, tax on taxable lines only, discounts, currencies, terms and notes; gap-free numbering per entity assigned on issue; issued invoices locked in the database and corrected only by numbered credit notes; void with reason; overdue derived from the due date. Branded A4 PDF (Veritas, Mimshac, Nextmove, Hub default) with the practice details frozen at issue.
+- **Payments**: Stripe Checkout links for the balance, applied only from signed, de-duplicated webhooks (`/api/payments/stripe`); manual payments (EFT, cash, card machine) wait for a second person to verify them against the bank statement; reject, allocate, full refunds. Payments page with the reconciliation queue.
+- **Proposals**: invoice an accepted proposal as deposit, balance or full; "expired" shown for sent proposals past their validity.
+- **Reports**: billed, received, outstanding, overdue and ageing per currency for a chosen period, per practice and across practices (`/finance`). Billing settings per practice (prefixes, currency, terms, tax, bank details, footer).
+- New permissions `invoices:view/edit/issue`, `payments:verify`. Migrations 0020–0021. Navigation: Proposals & Finance now opens the finance workspace.
+- Fixed: proposal and invoice PDFs lost page numbers and middle dots (react-pdf drops `render` text when the page sets `lineHeight`; the standard font has no "·").
+- Airtable mirror: the first sync of a dataset is now always a full import (a manual incremental sync with no cursor previously imported nothing). `AIRTABLE_TOKEN` is set in Vercel; Hub clients imported 147 records live.
+- Tests: 102 unit/integration and 13 end-to-end (finance flow with axe on every finance page).
+
+**Waiting on Owen:** Stripe test keys (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) in Vercel to switch card links on; billing details (registration, bank details, tax position) per practice in Billing settings.
+
+**Next:** Milestone 3 part 2: the document workspace (templates with validated merge fields, editor with autosave and versions, review and approval, DOCX/PDF export, uploads with OCR).
+
 ## 24 Oct 2026: Milestone 2 (part 1): matters, tasks, notes and calendar
 **Done:**
 - **Matters** under clients (`src/server/modules/matters`): open from a client or an accepted proposal; stages configurable per practice and per service (default set: opening → documents → preparation → review → submission → follow-up → outcome → closed); applicants and dependants with status and passport expiry; facts tagged verified / client statement / staff assessment (verification needs evidence and records who and when); deadlines and key dates with their basis (recorded from a document, calculated from a practice-validated rule, or adjusted with a reason and reviewer); team (case manager, consultant, members); restricted matters visible only to the team and practice administrators, enforced in PostgreSQL row-level security as well as the service; activity history.

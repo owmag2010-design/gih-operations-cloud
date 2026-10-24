@@ -42,7 +42,7 @@ export function hqNav(ctx: AccessContext, opts: { unread?: number; tasksDue?: nu
   else if (ctx.has("mirror:view") || ctx.has("mirror:manage")) items.push({ label: "Clients & Matters", short: "Records", href: "/airtable", icon: "user-round" });
   items.push({ label: "Tasks & Calendar", short: "Tasks", href: "/tasks", icon: "calendar", match: ["/calendar"], badge: opts.tasksDue, badgeLabel: "overdue" });
   if (ctx.has("hub_templates:manage") || ctx.has("intake:view")) items.push({ label: "Documents & Templates", short: "Documents", href: "/hq/templates", icon: "folder", match: ["/settings/signatures"] });
-  items.push({ label: "Proposals & Finance", short: "Finance", href: soon("finance"), icon: "wallet", soon: "Milestone 3" });
+  if ([...ctx.firms.values()].some((f) => f.permissions.has("invoices:view"))) items.push({ label: "Proposals & Finance", short: "Finance", href: "/finance", icon: "wallet" });
   items.push({ label: "Knowledge & Updates", short: "Knowledge", href: soon("knowledge"), icon: "book", soon: "Milestone 4" });
   items.push({ label: "Content", href: soon("content"), icon: "megaphone", soon: "Milestone 4" });
   if (ctx.has("audit:view") || ctx.has("metrics:group")) items.push({ label: "Reports", href: "/hq/audit", icon: "chart" });
@@ -61,7 +61,8 @@ export function firmNav(ctx: AccessContext, firmId: string, slug: string, opts: 
   else if (ctx.has("matters:view_all", firmId) || ctx.has("matters:view_assigned", firmId)) items.push({ label: "Clients & Matters", short: "Matters", href: `${base}/matters`, icon: "user-round" });
   items.push({ label: "Tasks & Calendar", short: "Tasks", href: "/tasks", icon: "calendar", match: ["/calendar"], badge: opts.tasksDue, badgeLabel: "overdue" });
   if (ctx.has("email:view", firmId) || ctx.has("templates:manage", firmId)) items.push({ label: "Documents & Templates", short: "Documents", href: `${base}/templates`, icon: "folder" });
-  if (ctx.has("proposals:view", firmId)) items.push({ label: "Proposals & Finance", short: "Finance", href: `${base}/proposals`, icon: "wallet" });
+  if (ctx.has("invoices:view", firmId)) items.push({ label: "Proposals & Finance", short: "Finance", href: `${base}/finance`, icon: "wallet", match: [`${base}/proposals`] });
+  else if (ctx.has("proposals:view", firmId)) items.push({ label: "Proposals & Finance", short: "Finance", href: `${base}/proposals`, icon: "wallet" });
   items.push({ label: "Knowledge & Updates", short: "Knowledge", href: soon("knowledge"), icon: "book", soon: "Milestone 4" });
   items.push({ label: "Content", href: soon("content"), icon: "megaphone", soon: "Milestone 4" });
   if (ctx.has("audit:firm", firmId)) items.push({ label: "Reports", href: `${base}/audit`, icon: "chart" });

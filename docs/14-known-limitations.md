@@ -52,5 +52,18 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L42 | Client-visible notes are only classified | There is no client portal yet to show them in | Client portal (Milestone 4) |
 | L43 | Matter checklists, documents and fees per matter aren't built | The matter shows the linked proposal only | Documents and finance (Milestone 3) |
 | L44 | The Airtable mirror is read-only | Changes must still be made in Airtable | Write-back design in docs/16-airtable-mirror.md |
-| L45 | The Airtable mirror needs `AIRTABLE_TOKEN` | Nothing is imported until a token is added in Vercel | Owen to create a read-only personal access token |
+| L45 | ~~The Airtable mirror needs `AIRTABLE_TOKEN`~~ | Resolved 24 Oct 2026: token added in Vercel | — |
 | L46 | Airtable record search is a simple text match over field values | Fine for current volumes | Full-text index if tables grow large |
+
+## Added 24 Oct 2026 (milestone 3: finance)
+
+| # | Limitation | Impact | Plan |
+|---|---|---|---|
+| L47 | Not an accounting or trust-accounting system: no ledger, journals, VAT returns or trust account reconciliation | Books stay in each practice's accounting package | By design (brief) |
+| L48 | Card payments need Stripe keys in Vercel | Until then "Create payment link" is unavailable and the app says so; bank payments can be recorded | Owen adds test keys first; live keys only on the practice's decision |
+| L49 | Bank statements aren't imported; verification is a person checking the statement and recording the line | Manual step per payment | Statement import (CSV/OFX) with matching suggestions |
+| L50 | Partial Stripe refunds are flagged in the event log but not applied automatically | A person adjusts with a credit note | Handle partial refunds once the policy is agreed |
+| L51 | Invoices aren't emailed from the app yet | Download the PDF and send it from the inbox | Send from the inbox with the PDF attached (next) |
+| L52 | No instalment plans beyond deposit and balance from a proposal | Other schedules are separate invoices made by hand | Payment schedules on proposals if practices need them |
+| L53 | Discounts reduce the taxable base proportionally across taxable lines | Matches common practice; a line-specific discount isn't modelled | Revisit if a practice needs it |
+| L54 | No foreign-exchange handling: each currency is reported separately | Totals across currencies aren't shown | By design |

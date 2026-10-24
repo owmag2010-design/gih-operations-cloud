@@ -200,7 +200,10 @@ export async function getInvoice(ctx: AccessContext, firmId: string, id: string)
     const matter = inv.matterId ? ((await tx.select({ id: matters.id, ref: matters.ref, title: matters.title }).from(matters).where(eq(matters.id, inv.matterId)))[0] ?? null) : null;
     const proposal = inv.proposalId ? ((await tx.select({ id: proposals.id, ref: proposals.ref }).from(proposals).where(eq(proposals.id, inv.proposalId)))[0] ?? null) : null;
     const billing = await billingTx(tx, firmId, ctx.firm(firmId).refPrefix);
+    const [firm] = await tx.select().from(firms).where(eq(firms.id, firmId));
+    const printed = (inv.issuedSnapshot as PrintedDetails | null) ?? printedFrom(firm, billing);
     return {
+      printed,
       invoice: { ...inv, display: displayStatus(inv), balanceMinor: Math.max(0, inv.totalMinor - inv.paidMinor - inv.creditedMinor) },
       lines,
       payments: pays.map((r) => ({ ...r.p, recordedBy: r.recordedBy, verifiedByName: r.verifiedByName })),
@@ -310,6 +313,19 @@ export async function updateDraft(ctx: AccessContext, firmId: string, id: string
   });
 }
 
+/** Practice details as printed on an invoice. Issued invoices keep the copy taken when they were issued. */
+export type PrintedDetails = {
+  tradingName: string; legalName: string; slug: string; brandColor: string; website: string | null; contactEmail: string | null; contactPhone: string | null;
+  address: string | null; registrationNumber: string | null; taxNumber: string | null; taxLabel: string | null; bankDetails: string | null; footer: string | null;
+};
+
+function printedFrom(firm: typeof firms.$inferSelect, billing: Awaited<ReturnType<typeof billingTx>>): PrintedDetails {
+  return {
+    tradingName: firm.tradingName, legalName: firm.legalName, slug: firm.slug, brandColor: firm.brandColor, website: firm.website, contactEmail: firm.contactEmail, contactPhone: firm.contactPhone,
+    address: billing.address, registrationNumber: billing.registrationNumber, taxNumber: billing.taxNumber, taxLabel: billing.taxLabel, bankDetails: billing.bankDetails, footer: billing.invoiceFooter,
+  };
+}
+
 async function nextNumber(tx: Tx, firmId: string, key: "invoice" | "credit_note", prefix: string) {
   const res = await tx.execute<{ value: number }>(sql`
     insert into firm_sequences (firm_id, key, value) values (${firmId}, ${key}, 1)
@@ -332,10 +348,7 @@ export async function issueInvoice(ctx: AccessContext, firmId: string, id: strin
     const dueDate = addCalendarDays(issueDate, opts.dueDays ?? billing.paymentTermsDays);
     const number = await nextNumber(tx, firmId, "invoice", billing.invoicePrefix);
     const [firm] = await tx.select().from(firms).where(eq(firms.id, firmId));
-    const snapshot = {
-      tradingName: firm.tradingName, legalName: firm.legalName, slug: firm.slug, brandColor: firm.brandColor, website: firm.website, contactEmail: firm.contactEmail, contactPhone: firm.contactPhone,
-      address: billing.address, registrationNumber: billing.registrationNumber, taxNumber: billing.taxNumber, taxLabel: billing.taxLabel, bankDetails: billing.bankDetails, footer: billing.invoiceFooter,
-    };
+    const snapshot = printedFrom(firm, billing);
     const [issued] = await tx
       .update(invoices)
       .set({ status: "issued", number, issueDate, dueDate, issuedAt: new Date(), issuedById: ctx.user.id, issuedSnapshot: snapshot, updatedAt: new Date() })
@@ -540,5 +553,19 @@ export async function invoiceFormOptions(ctx: AccessContext, firmId: string) {
       : [];
     const billing = await billingTx(tx, firmId, ctx.firm(firmId).refPrefix);
     return { clients: cl, matters: ms, billing };
+  });
+}
+
+/** Invoices raised from a proposal (deposit, balance or full), for the proposal page. */
+export async function proposalInvoices(ctx: AccessContext, firmId: string, proposalId: string) {
+  ctx.require("invoices:view", firmId);
+  if (!z.string().uuid().safeParse(proposalId).success) return [];
+  return withScope(ctx.scopeFor(firmId), async (tx) => {
+    const rows = await tx
+      .select({ id: invoices.id, number: invoices.number, reference: invoices.reference, status: invoices.status, dueDate: invoices.dueDate, totalMinor: invoices.totalMinor, paidMinor: invoices.paidMinor, creditedMinor: invoices.creditedMinor, currency: invoices.currency })
+      .from(invoices)
+      .where(and(eq(invoices.firmId, firmId), eq(invoices.proposalId, proposalId)))
+      .orderBy(asc(invoices.createdAt));
+    return rows.map((r) => ({ ...r, display: displayStatus(r), part: r.status === "void" ? null : (r.reference?.match(/ (deposit|balance|full)$/)?.[1] ?? null) }));
   });
 }

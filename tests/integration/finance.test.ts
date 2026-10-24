@@ -9,6 +9,7 @@ import {
   allocatePayment, computeTotals, createInvoice, creditInvoice, financeSummary, getInvoice, issueInvoice, listInvoices, recordPayment, reconciliationQueue,
   saveBilling, updateDraft, verifyPayment, voidInvoice,
 } from "../../src/server/modules/finance/finance";
+import { renderInvoicePdf } from "../../src/server/modules/finance/pdf";
 import { createPaymentLink, handleStripeWebhook } from "../../src/server/modules/finance/stripe-payments";
 import { firmId, lead, makeUser, owner, resetDatabase } from "../support/fixtures";
 
@@ -126,5 +127,23 @@ describe("finance", () => {
     expect((await getInvoice(admin, veritas, inv.id)).invoice.status).toBe("issued");
     const events = await owner.select().from(s.paymentEvents).where(eq(s.paymentEvents.provider, "stripe"));
     expect(events).toHaveLength(3);
+  });
+
+  it("keeps the practice details an invoice was issued with, and renders draft and issued PDFs", async () => {
+    const { veritas, finance, consultant, client } = await setup();
+    await saveBilling(finance, veritas, { invoicePrefix: "VE-INV", creditNotePrefix: "VE-CN", defaultCurrency: "ZAR", paymentTermsDays: "7", bankDetails: "Bank A, account held by the practice" });
+    const draft = await createInvoice(consultant, veritas, { clientId: client.id }, lines);
+    const asDraft = await getInvoice(finance, veritas, draft.id);
+    expect(asDraft.printed.bankDetails).toBe("Bank A, account held by the practice");
+    const pdfDraft = await renderInvoicePdf({ printed: asDraft.printed, invoice: asDraft.invoice, lines: asDraft.lines, clientRef: client.ref, matterRef: null });
+    expect(pdfDraft.subarray(0, 5).toString()).toBe("%PDF-");
+
+    await issueInvoice(finance, veritas, draft.id);
+    await saveBilling(finance, veritas, { invoicePrefix: "VE-INV", creditNotePrefix: "VE-CN", defaultCurrency: "ZAR", paymentTermsDays: "7", bankDetails: "Bank B" });
+    const issued = await getInvoice(finance, veritas, draft.id);
+    expect(issued.printed.bankDetails).toBe("Bank A, account held by the practice");
+    expect(issued.billing.bankDetails).toBe("Bank B");
+    const pdf = await renderInvoicePdf({ printed: issued.printed, invoice: issued.invoice, lines: issued.lines, clientRef: client.ref, matterRef: null });
+    expect(pdf.length).toBeGreaterThan(1000);
   });
 });
