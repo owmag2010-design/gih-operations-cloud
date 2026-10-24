@@ -14,6 +14,7 @@ import {
   bigserial,
   boolean,
   customType,
+  date,
   index,
   integer,
   jsonb,
@@ -66,6 +67,12 @@ export const activityType = pgEnum("activity_type", [
   "routed",
   "proposal",
   "email",
+  "matter",
+  "task",
+  "fact",
+  "date",
+  "event",
+  "people",
 ]);
 export const emailDirection = pgEnum("email_direction", ["inbound", "outbound"]);
 export const emailThreadStatus = pgEnum("email_thread_status", ["open", "closed"]);
@@ -89,6 +96,17 @@ export const mailProvider = pgEnum("mail_provider", ["forwarding", "microsoft", 
 export const mailConnectionStatus = pgEnum("mail_connection_status", ["connected", "needs_reconnect", "error", "disconnected"]);
 export const templateFormat = pgEnum("template_format", ["blocks", "html"]);
 export const draftMode = pgEnum("email_draft_mode", ["new", "reply", "reply_all", "forward"]);
+export const matterStageCategory = pgEnum("matter_stage_category", ["opening", "active", "submitted", "closed"]);
+export const matterRisk = pgEnum("matter_risk", ["low", "medium", "high"]);
+export const matterPersonRole = pgEnum("matter_person_role", ["main_applicant", "spouse_partner", "dependant_child", "dependant_other", "sponsor", "employer_contact"]);
+export const factBasis = pgEnum("fact_basis", ["verified", "client_statement", "staff_assessment"]);
+export const matterDateKind = pgEnum("matter_date_kind", ["deadline", "expiry", "submission", "other"]);
+export const dateBasisKind = pgEnum("date_basis_kind", ["recorded", "calculated", "adjusted"]);
+export const taskStatus = pgEnum("task_status", ["open", "done", "cancelled"]);
+export const taskRecurrence = pgEnum("task_recurrence", ["none", "daily", "weekly", "monthly", "yearly"]);
+export const taskAssignRule = pgEnum("task_assign_rule", ["case_manager", "consultant", "unassigned"]);
+export const noteVisibility = pgEnum("note_visibility", ["internal", "client_visible"]);
+export const eventKind = pgEnum("event_kind", ["consultation", "appointment", "biometrics", "interview", "submission", "meeting", "other"]);
 
 /* ───────────────────── Organisation ───────────────────── */
 
@@ -417,13 +435,14 @@ export const activities = pgTable(
     firmId: uuid("firm_id").notNull().references(() => firms.id),
     leadId: uuid("lead_id").references(() => leads.id),
     clientId: uuid("client_id").references(() => clients.id),
+    matterId: uuid("matter_id"),
     type: activityType("type").notNull(),
     body: text("body"),
     data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
     actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
-  (t) => [index("activities_lead_idx").on(t.leadId, t.createdAt), index("activities_client_idx").on(t.clientId, t.createdAt)],
+  (t) => [index("activities_lead_idx").on(t.leadId, t.createdAt), index("activities_client_idx").on(t.clientId, t.createdAt), index("activities_matter_idx").on(t.matterId, t.createdAt)],
 );
 
 export const savedViews = pgTable(
@@ -966,4 +985,302 @@ export const storedFiles = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("stored_files_scope_idx").on(t.orgId, t.firmId)],
+);
+
+/* ───────────────────── Matters (milestone 2) ───────────────────── */
+
+/** Matter stages, configurable per practice and optionally per service. */
+export const matterStages = pgTable(
+  "matter_stages",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id"),
+    key: text("key").notNull(),
+    name: text("name").notNull(),
+    position: integer("position").notNull(),
+    category: matterStageCategory("category").notNull().default("active"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index("matter_stages_firm_idx").on(t.firmId, t.position)],
+);
+
+export const matters = pgTable(
+  "matters",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    clientId: uuid("client_id").notNull(),
+    ref: text("ref").notNull(),
+    title: text("title").notNull(),
+    serviceId: uuid("service_id"),
+    legalCategory: text("legal_category"),
+    jurisdiction: text("jurisdiction"),
+    stageId: uuid("stage_id").notNull(),
+    caseManagerId: uuid("case_manager_id").references(() => users.id, { onDelete: "set null" }),
+    consultantId: uuid("consultant_id").references(() => users.id, { onDelete: "set null" }),
+    /** Restricted matters are visible only to their team and the practice's administrators. */
+    restricted: boolean("restricted").notNull().default(false),
+    proposalId: uuid("proposal_id"),
+    risk: matterRisk("risk").notNull().default("low"),
+    riskNote: text("risk_note"),
+    submissionReference: text("submission_reference"),
+    submissionChannel: text("submission_channel"),
+    submittedOn: date("submitted_on"),
+    outcome: text("outcome"),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("matters_firm_ref_uq").on(t.firmId, t.ref),
+    index("matters_firm_client_idx").on(t.firmId, t.clientId),
+    index("matters_firm_stage_idx").on(t.firmId, t.stageId),
+    index("matters_case_manager_idx").on(t.firmId, t.caseManagerId),
+  ],
+);
+
+/** People on the matter team beyond the case manager and consultant. */
+export const matterMembers = pgTable(
+  "matter_members",
+  {
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    matterId: uuid("matter_id").notNull(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    addedById: uuid("added_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.matterId, t.userId] })],
+);
+
+/** Applicants, dependants and other people on a matter. */
+export const matterPeople = pgTable(
+  "matter_people",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    matterId: uuid("matter_id").notNull(),
+    role: matterPersonRole("role").notNull(),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name"),
+    dateOfBirth: date("date_of_birth"),
+    nationality: text("nationality"),
+    immigrationStatus: text("immigration_status"),
+    statusExpiresOn: date("status_expires_on"),
+    passportExpiresOn: date("passport_expires_on"),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("matter_people_matter_idx").on(t.matterId)],
+);
+
+/** Facts about a matter, each with its basis: verified, what the client said, or a staff assessment. */
+export const matterFacts = pgTable(
+  "matter_facts",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    matterId: uuid("matter_id").notNull(),
+    personId: uuid("person_id"),
+    label: text("label").notNull(),
+    value: text("value").notNull(),
+    basis: factBasis("basis").notNull(),
+    evidence: text("evidence"),
+    recordedById: uuid("recorded_by_id").references(() => users.id, { onDelete: "set null" }),
+    verifiedById: uuid("verified_by_id").references(() => users.id, { onDelete: "set null" }),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("matter_facts_matter_idx").on(t.matterId)],
+);
+
+/**
+ * Deadline rules a practice has checked and approved. Calculated dates come
+ * only from rules marked validated; each calculated date records its rule.
+ */
+export const deadlineRules = pgTable(
+  "deadline_rules",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    jurisdiction: text("jurisdiction").notNull(),
+    offsetDays: integer("offset_days").notNull(),
+    businessDays: boolean("business_days").notNull().default(false),
+    fromLabel: text("from_label").notNull(),
+    source: text("source").notNull(),
+    validatedById: uuid("validated_by_id").references(() => users.id, { onDelete: "set null" }),
+    validatedAt: timestamp("validated_at", { withTimezone: true }),
+    isActive: boolean("is_active").notNull().default(true),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("deadline_rules_firm_idx").on(t.firmId)],
+);
+
+/** Deadlines, expiry dates and submission dates on a matter, with their basis. */
+export const matterDates = pgTable(
+  "matter_dates",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    matterId: uuid("matter_id").notNull(),
+    personId: uuid("person_id"),
+    kind: matterDateKind("kind").notNull(),
+    label: text("label").notNull(),
+    dueOn: date("due_on").notNull(),
+    basisKind: dateBasisKind("basis_kind").notNull(),
+    basis: text("basis").notNull(),
+    ruleId: uuid("rule_id"),
+    fromDate: date("from_date"),
+    calculatedOn: date("calculated_on"),
+    adjustmentReason: text("adjustment_reason"),
+    reviewedById: uuid("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("matter_dates_firm_due_idx").on(t.firmId, t.dueOn), index("matter_dates_matter_idx").on(t.matterId)],
+);
+
+/* ───────────────────── Tasks, notes and calendar (milestone 2) ───────────────────── */
+
+/** Reusable tasks created when a matter opens or reaches a stage. */
+export const taskTemplates = pgTable(
+  "task_templates",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id"),
+    stageId: uuid("stage_id"),
+    title: text("title").notNull(),
+    description: text("description"),
+    priority: leadPriority("priority").notNull().default("normal"),
+    dueOffsetDays: integer("due_offset_days"),
+    assignTo: taskAssignRule("assign_to").notNull().default("case_manager"),
+    position: integer("position").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("task_templates_firm_idx").on(t.firmId, t.stageId)],
+);
+
+/**
+ * Tasks: personal (no practice, owner only), team (a practice, no assignee)
+ * or assigned, optionally linked to a matter, client or lead.
+ */
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: taskStatus("status").notNull().default("open"),
+    priority: leadPriority("priority").notNull().default("normal"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    allDay: boolean("all_day").notNull().default(true),
+    reminderAt: timestamp("reminder_at", { withTimezone: true }),
+    recurrence: taskRecurrence("recurrence").notNull().default("none"),
+    recurrenceInterval: integer("recurrence_interval").notNull().default(1),
+    assigneeId: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    matterId: uuid("matter_id"),
+    clientId: uuid("client_id"),
+    leadId: uuid("lead_id"),
+    templateId: uuid("template_id"),
+    previousId: uuid("previous_id"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    completedById: uuid("completed_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdById: uuid("created_by_id").notNull().references(() => users.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("tasks_assignee_idx").on(t.assigneeId, t.status, t.dueAt),
+    index("tasks_firm_idx").on(t.firmId, t.status, t.dueAt),
+    index("tasks_matter_idx").on(t.matterId),
+    uniqueIndex("tasks_template_once_uq").on(t.matterId, t.templateId),
+  ],
+);
+
+/** Notes on a matter, client or lead, classified internal or client-visible, with revisions. */
+export const notes = pgTable(
+  "notes",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    matterId: uuid("matter_id"),
+    clientId: uuid("client_id"),
+    leadId: uuid("lead_id"),
+    visibility: noteVisibility("visibility").notNull().default("internal"),
+    body: text("body").notNull(),
+    version: integer("version").notNull().default(1),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [index("notes_matter_idx").on(t.matterId), index("notes_client_idx").on(t.clientId), index("notes_firm_idx").on(t.firmId, t.createdAt)],
+);
+
+export const noteRevisions = pgTable(
+  "note_revisions",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    noteId: uuid("note_id").notNull(),
+    version: integer("version").notNull(),
+    body: text("body").notNull(),
+    visibility: noteVisibility("visibility").notNull(),
+    editedById: uuid("edited_by_id").references(() => users.id, { onDelete: "set null" }),
+    editedAt: timestamp("edited_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("note_revisions_note_version_uq").on(t.noteId, t.version)],
+);
+
+/** Calendar events: consultations, appointments and other timed entries. */
+export const calendarEvents = pgTable(
+  "calendar_events",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").references(() => firms.id),
+    kind: eventKind("kind").notNull().default("appointment"),
+    title: text("title").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    allDay: boolean("all_day").notNull().default(false),
+    /** IANA time zone the event was entered in (shown alongside the viewer's own). */
+    timeZone: text("time_zone").notNull().default("Africa/Johannesburg"),
+    location: text("location"),
+    notes: text("notes"),
+    matterId: uuid("matter_id"),
+    clientId: uuid("client_id"),
+    leadId: uuid("lead_id"),
+    organiserId: uuid("organiser_id").references(() => users.id, { onDelete: "set null" }),
+    /** Set when the event came from (or was sent to) an external calendar; prevents duplicates. */
+    externalSource: text("external_source"),
+    externalId: text("external_id"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdById: uuid("created_by_id").notNull().references(() => users.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("calendar_events_firm_start_idx").on(t.firmId, t.startsAt),
+    index("calendar_events_matter_idx").on(t.matterId),
+    uniqueIndex("calendar_events_external_uq").on(t.orgId, t.externalSource, t.externalId),
+  ],
 );

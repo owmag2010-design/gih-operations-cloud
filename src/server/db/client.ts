@@ -38,6 +38,8 @@ export type Scope = {
   auditScope?: "org" | "firm" | "";
   /** Mail sync and inbound webhooks: may read personal mailboxes' conversations. Never set from a user request. */
   mailSystem?: boolean;
+  /** Firms where the caller administers the practice and so sees restricted matters. */
+  matterAdminFirms?: readonly string[];
 };
 
 /**
@@ -46,7 +48,7 @@ export type Scope = {
  * sharing the pooled connection.
  */
 export async function withScope<T>(scope: Scope, fn: (tx: Tx) => Promise<T>): Promise<T> {
-  for (const id of scope.firmIds) {
+  for (const id of [...scope.firmIds, ...(scope.matterAdminFirms ?? [])]) {
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Invalid firm id in scope");
   }
   return db().transaction(async (tx) => {
@@ -56,7 +58,8 @@ export async function withScope<T>(scope: Scope, fn: (tx: Tx) => Promise<T>): Pr
       set_config('app.firm_ids', ${scope.firmIds.join(",")}, true),
       set_config('app.intake', ${scope.intake ? "on" : "off"}, true),
       set_config('app.audit_scope', ${scope.auditScope ?? ""}, true),
-      set_config('app.mail_system', ${scope.mailSystem ? "on" : "off"}, true)`);
+      set_config('app.mail_system', ${scope.mailSystem ? "on" : "off"}, true),
+      set_config('app.matter_admin_firms', ${(scope.matterAdminFirms ?? []).join(",")}, true)`);
     return fn(tx);
   });
 }

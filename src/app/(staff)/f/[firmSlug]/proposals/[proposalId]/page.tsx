@@ -40,7 +40,7 @@ export default async function ProposalPage({ params }: PageProps<"/f/[firmSlug]/
         }
       />
       {p.status === "changes_requested" && p.reviewNote ? <Notice tone="warn" className="mb-4"><strong>Changes requested:</strong> {p.reviewNote}</Notice> : null}
-      {p.status === "accepted" ? <Notice tone="ok" className="mb-4">Accepted by {p.responseName} on <LocalTime value={p.respondedAt} />. {lead?.convertedClientId ? "The lead is already a client." : <>Next: <Link className="underline" href={`${base}/leads/${lead?.id}`}>convert the lead to a client</Link> once the deposit is paid.</>}</Notice> : null}
+      {p.status === "accepted" ? <Notice tone="ok" className="mb-4">Accepted by {p.responseName} on <LocalTime value={p.respondedAt} />. {lead?.convertedClientId ? (ctx.has("matters:create", firm.firmId) ? <>Next: <Link className="underline" href={`${base}/matters/new?client=${lead.convertedClientId}&proposal=${p.id}`}>open the matter</Link>.</> : "The lead is already a client.") : <>Next: <Link className="underline" href={`${base}/leads/${lead?.id}`}>convert the lead to a client</Link> once the deposit is paid, then open the matter.</>}</Notice> : null}
       {p.status === "declined" ? <Notice tone="danger" className="mb-4">Declined by {p.responseName}{p.responseNote ? `: “${p.responseNote}”` : "."} You can start a new version.</Notice> : null}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">

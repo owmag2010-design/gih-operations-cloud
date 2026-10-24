@@ -69,7 +69,7 @@ export default async function ClientsPage({ params, searchParams }: PageProps<"/
                     <td className={`${t.td} text-ink-2`}>{c.email ?? c.phone}</td>
                     <td className={t.td}>{countryName(c.nationality)}</td>
                     <td className={t.td}>{countryName(c.countryOfResidence)}</td>
-                    <td className={t.td}>{c.consultantName ?? <span className="text-muted/70">None</span>}</td>
+                    <td className={t.td}>{c.consultantName ?? <span className="text-muted">None</span>}</td>
                     <td className={t.td}><Badge tone={STATUS[c.status]} className="capitalize">{c.status}</Badge></td>
                     <td className={`${t.td} text-ink-2`}><LocalTime value={c.createdAt} mode="date" /></td>
                   </tr>

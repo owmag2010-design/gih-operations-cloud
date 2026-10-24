@@ -23,6 +23,13 @@ function describe(item: Item, stageName: (id: string) => string) {
       return `${d.direction === "inbound" ? "Email received" : "Sent an email"}: “${item.body ?? ""}”`;
     case "proposal":
       return `${item.body ?? "Proposal updated"}${d.ref && !(item.body ?? "").includes(String(d.ref)) ? ` (${d.ref})` : ""}`;
+    case "matter":
+    case "task":
+    case "fact":
+    case "date":
+    case "event":
+    case "people":
+      return item.body ?? ACTIVITY_LABELS[item.type] ?? item.type;
     case "created":
       return d.fromLead ? `Created from lead ${d.fromLead}` : "Created";
     default:
@@ -30,7 +37,7 @@ function describe(item: Item, stageName: (id: string) => string) {
   }
 }
 
-/** Activity feed for leads and clients. Notes are shown in full; other events as one line. */
+/** Activity feed for leads, clients and matters. Notes are shown in full; other events as one line. */
 export function Timeline({ items, stages = [] }: { items: Item[]; stages?: { id: string; name: string }[] }) {
   if (!items.length) return <EmptyState title="No activity yet" />;
   const stageName = (id: string) => stages.find((s) => s.id === id)?.name ?? "another stage";
@@ -42,7 +49,7 @@ export function Timeline({ items, stages = [] }: { items: Item[]; stages?: { id:
           <div className="min-w-0 flex-1">
             <p className="text-[13px] text-ink-2">
               <span className="font-medium text-ink">{item.actorName ?? (item.type === "proposal" || (item.type === "email" && item.data?.direction === "inbound") ? "Client" : "System")}</span>{" "}
-              {item.type === "note" ? "added a note" : describe(item, stageName).replace(/^./, (c) => c.toLowerCase())}
+              {item.type === "note" ? "added a note" : ["matter", "task", "fact", "date", "event", "people"].includes(item.type) ? <>· {describe(item, stageName)}</> : describe(item, stageName).replace(/^./, (c) => c.toLowerCase())}
               <span className="ml-2 text-xs text-muted"><LocalTime value={item.createdAt} mode="relative" /></span>
             </p>
             {item.type === "note" && item.body ? <p className="mt-1 max-w-[75ch] rounded-md bg-sunken px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap text-ink">{item.body}</p> : null}

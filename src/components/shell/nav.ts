@@ -11,7 +11,7 @@ export type IconName =
   | "gauge" | "inbox" | "route" | "building" | "users" | "scroll" | "contact" | "user-round" | "settings" | "layout" | "file-text"
   | "mail" | "templates" | "at-sign" | "calendar" | "folder" | "wallet" | "book" | "megaphone" | "chart" | "sunrise";
 
-export type NavItem = { label: string; href: string; icon: IconName; exact?: boolean; soon?: string; match?: string[]; badge?: number; /** Label in the top bar. */ short?: string };
+export type NavItem = { label: string; href: string; icon: IconName; exact?: boolean; soon?: string; match?: string[]; badge?: number; /** What the badge counts, for screen readers (default "unread"). */ badgeLabel?: string; /** Label in the top bar. */ short?: string };
 /** Kept for compatibility with older layouts; the new navigation lists everything. */
 export type FutureItem = { label: string; release: number };
 
@@ -31,14 +31,15 @@ export type ModuleKey = keyof typeof MODULES;
 
 const soon = (k: ModuleKey) => `/soon/${k}`;
 
-export function hqNav(ctx: AccessContext, opts: { unread?: number } = {}): NavItem[] {
+export function hqNav(ctx: AccessContext, opts: { unread?: number; tasksDue?: number } = {}): NavItem[] {
   const items: NavItem[] = [{ label: "My day", href: "/today", icon: "sunrise", exact: true }];
   if (ctx.has("metrics:group")) items.push({ label: "Command Centre", short: "Command Centre", href: "/hq", icon: "gauge", exact: true });
   const anyInbox = ctx.has("intake:view") || [...ctx.firms.values()].some((f) => f.permissions.has("email:view"));
   if (anyInbox) items.push({ label: "Inbox", href: "/inbox", icon: "inbox", badge: opts.unread });
   if (ctx.has("intake:view")) items.push({ label: "Enquiries & Deals", short: "Enquiries", href: "/hq/intake", icon: "contact", match: ["/hq/routing"] });
-  items.push({ label: "Clients & Matters", short: "Clients & matters", href: soon("matters"), icon: "user-round", soon: "Milestone 2" });
-  items.push({ label: "Tasks & Calendar", short: "Calendar", href: soon("tasks"), icon: "calendar", soon: "Milestone 2" });
+  const matterFirms = [...ctx.firms.values()].filter((f) => f.permissions.has("matters:view_all") || f.permissions.has("matters:view_assigned"));
+  if (matterFirms.length) items.push({ label: "Clients & Matters", short: "Matters", href: "/matters", icon: "user-round" });
+  items.push({ label: "Tasks & Calendar", short: "Tasks", href: "/tasks", icon: "calendar", match: ["/calendar"], badge: opts.tasksDue, badgeLabel: "overdue" });
   if (ctx.has("hub_templates:manage") || ctx.has("intake:view")) items.push({ label: "Documents & Templates", short: "Documents", href: "/hq/templates", icon: "folder", match: ["/settings/signatures"] });
   items.push({ label: "Proposals & Finance", short: "Finance", href: soon("finance"), icon: "wallet", soon: "Milestone 3" });
   items.push({ label: "Knowledge & Updates", short: "Knowledge", href: soon("knowledge"), icon: "book", soon: "Milestone 4" });
@@ -50,13 +51,14 @@ export function hqNav(ctx: AccessContext, opts: { unread?: number } = {}): NavIt
 
 export const HQ_FUTURE: FutureItem[] = [];
 
-export function firmNav(ctx: AccessContext, firmId: string, slug: string, opts: { unread?: number } = {}): NavItem[] {
+export function firmNav(ctx: AccessContext, firmId: string, slug: string, opts: { unread?: number; tasksDue?: number } = {}): NavItem[] {
   const base = `/f/${slug}`;
   const items: NavItem[] = [{ label: "My day", href: "/today", icon: "sunrise", exact: true }, { label: "Practice overview", short: "Practice", href: base, icon: "layout", exact: true }];
   if (ctx.has("email:view", firmId)) items.push({ label: "Inbox", href: `/inbox?practice=${firmId}`, icon: "inbox", match: [`${base}/inbox`], badge: opts.unread });
   if (ctx.has("leads:view_all", firmId) || ctx.has("leads:view_assigned", firmId)) items.push({ label: "Enquiries & Deals", short: "Enquiries", href: `${base}/leads`, icon: "contact" });
-  if (ctx.has("clients:view_all", firmId) || ctx.has("clients:view_assigned", firmId)) items.push({ label: "Clients & Matters", short: "Clients & matters", href: `${base}/clients`, icon: "user-round" });
-  items.push({ label: "Tasks & Calendar", short: "Calendar", href: soon("tasks"), icon: "calendar", soon: "Milestone 2" });
+  if (ctx.has("clients:view_all", firmId) || ctx.has("clients:view_assigned", firmId)) items.push({ label: "Clients & Matters", short: "Clients & matters", href: `${base}/clients`, icon: "user-round", match: [`${base}/matters`] });
+  else if (ctx.has("matters:view_all", firmId) || ctx.has("matters:view_assigned", firmId)) items.push({ label: "Clients & Matters", short: "Matters", href: `${base}/matters`, icon: "user-round" });
+  items.push({ label: "Tasks & Calendar", short: "Tasks", href: "/tasks", icon: "calendar", match: ["/calendar"], badge: opts.tasksDue, badgeLabel: "overdue" });
   if (ctx.has("email:view", firmId) || ctx.has("templates:manage", firmId)) items.push({ label: "Documents & Templates", short: "Documents", href: `${base}/templates`, icon: "folder" });
   if (ctx.has("proposals:view", firmId)) items.push({ label: "Proposals & Finance", short: "Finance", href: `${base}/proposals`, icon: "wallet" });
   items.push({ label: "Knowledge & Updates", short: "Knowledge", href: soon("knowledge"), icon: "book", soon: "Milestone 4" });

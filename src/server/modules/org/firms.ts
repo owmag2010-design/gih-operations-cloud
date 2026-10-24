@@ -4,10 +4,11 @@ import { z } from "zod";
 import type { AccessContext } from "../../access/context";
 import { audit } from "../../audit";
 import { db, withScope } from "../../db/client";
-import { departments, firmMemberships, firmOffices, firms, offices, pipelineStages, roles, services } from "../../db/schema";
+import { departments, firmMemberships, firmOffices, firms, offices, matterStages, pipelineStages, roles, services } from "../../db/schema";
 import { AccessDeniedError, ConflictError, NotFoundError, ValidationError } from "../../errors";
 import { optionalEmail, optionalText, parseOrThrow } from "../../validation";
 import { DEFAULT_PIPELINE } from "../crm/pipeline-defaults";
+import { DEFAULT_MATTER_STAGES } from "../matters/defaults";
 
 const bool = z.union([z.literal("on"), z.literal("true"), z.boolean()]).optional().transform((v) => v === true || v === "on" || v === "true");
 
@@ -99,6 +100,7 @@ export async function createFirm(ctx: AccessContext, raw: unknown) {
     await tx.insert(firmMemberships).values({ firmId: firm.id, userId: ctx.user.id, roleId: adminRole.id, createdById: ctx.user.id });
     await tx.execute(sql`select set_config('app.firm_ids', ${firm.id}, true)`);
     for (const [i, st] of DEFAULT_PIPELINE.entries()) await tx.insert(pipelineStages).values({ firmId: firm.id, key: st.key, name: st.name, category: st.category, position: i });
+    for (const [i, st] of DEFAULT_MATTER_STAGES.entries()) await tx.insert(matterStages).values({ firmId: firm.id, key: st.key, name: st.name, category: st.category, position: i });
     await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId: firm.id, action: "firm.created", entityType: "firm", entityId: firm.id, summary: `Created ${firm.tradingName}; creator is Firm Administrator`, ip: ctx.ip }, tx);
     return firm;
   });

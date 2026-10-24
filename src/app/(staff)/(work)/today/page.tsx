@@ -19,6 +19,9 @@ function plural(n: number, one: string, many = `${one}s`) {
 function highlights(d: MyDay): string[] {
   const parts: string[] = [];
   if (d.inbox?.mine.length) parts.push(plural(d.inbox.mine.length, "conversation") + " assigned to you");
+  const overdue = d.tasks.filter((t) => t.overdue).length;
+  if (overdue) parts.push(plural(overdue, "overdue task"));
+  if (d.deadlines?.length) parts.push(plural(d.deadlines.length, "matter date") + " in the next two weeks");
   if (d.reviews?.length) parts.push(plural(d.reviews.length, "proposal") + " to approve");
   if (d.changes?.length) parts.push(plural(d.changes.length, "proposal") + " sent back to you");
   if (d.followUps?.length) parts.push(plural(d.followUps.length, "follow-up") + " due by tomorrow");
@@ -36,6 +39,8 @@ type Need = { key: string; href: string; eyebrow: string; title: string; detail:
 
 function needs(d: MyDay): Need[] {
   const out: Need[] = [];
+  for (const t of d.tasks.filter((x) => x.overdue || x.reminded))
+    out.push({ key: `task-${t.id}`, href: t.matterId && t.firm ? `/f/${t.firm.slug}/matters/${t.matterId}#tasks` : "/tasks", eyebrow: `${t.firm?.name ?? "Personal"} · ${t.overdue ? "overdue task" : "reminder"}`, title: t.title, detail: t.matterRef ? `Matter ${t.matterRef}` : null, slug: t.firm?.slug ?? null, color: t.firm?.brandColor ?? null, time: t.dueAt });
   for (const p of d.reviews ?? [])
     out.push({ key: `r-${p.id}`, href: `/f/${p.firm.slug}/proposals/${p.id}`, eyebrow: `${p.firm.name} · waiting for approval`, title: p.title, detail: `${p.ref} for ${p.recipient}. Approve to release the client link.`, slug: p.firm.slug, color: p.firm.brandColor });
   for (const p of d.changes ?? [])
@@ -53,6 +58,13 @@ export default async function TodayPage() {
   const firstName = ctx.user.name.split(/\s+/)[0] || ctx.user.name;
   const parts = highlights(d);
   const list = needs(d);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  type Up = { key: string; when: Date | string; title: string; sub: string; href: string; overdue: boolean };
+  const upcoming: Up[] = [
+    ...(d.deadlines ?? []).map((x) => ({ key: `d-${x.id}`, when: x.dueOn, title: `${x.label}`, sub: `${x.firm.name} · ${x.matterRef}`, href: `/f/${x.firm.slug}/matters/${x.matterId}`, overdue: x.dueOn < todayIso })),
+    ...d.tasks.filter((t) => t.dueAt && !t.overdue).map((t) => ({ key: `t-${t.id}`, when: t.dueAt!, title: t.title, sub: t.firm?.name ?? "Personal task", href: t.matterId && t.firm ? `/f/${t.firm.slug}/matters/${t.matterId}#tasks` : "/tasks", overdue: false })),
+    ...(d.followUps ?? []).map((l) => ({ key: `f-${l.id}`, when: l.followUpAt, title: `Follow up ${l.name}`, sub: l.firm.name, href: `/f/${l.firm.slug}/leads/${l.id}`, overdue: l.overdue })),
+  ].sort((a, b) => (typeof a.when === "string" ? a.when : a.when.toISOString()).localeCompare(typeof b.when === "string" ? b.when : b.when.toISOString()));
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -137,7 +149,8 @@ export default async function TodayPage() {
             {d.practices.map((p) => {
               const t = practicePalette(p.slug, p.brandColor).tile;
               const facts = [
-                p.openLeads !== null ? `${p.openLeads} open` : null,
+                p.openMatters !== null ? plural(p.openMatters, "matter") : null,
+                p.openLeads !== null ? `${p.openLeads} leads` : null,
                 p.proposalsOut !== null ? `${plural(p.proposalsOut, "proposal")} out` : null,
                 p.followUpsDue ? `${p.followUpsDue} follow-up${p.followUpsDue === 1 ? "" : "s"} due` : null,
               ].filter(Boolean);
@@ -169,16 +182,20 @@ export default async function TodayPage() {
       {/* Coming up */}
       <section className="flex flex-col gap-3.5 rounded-[22px] border border-hairline bg-surface p-5 lg:col-span-3" aria-labelledby="coming-h">
         <h2 id="coming-h" className="font-display text-2xl text-ink">Coming up</h2>
-        {d.followUps?.length ? (
+        {upcoming.length ? (
           <ul className="flex flex-col gap-3.5">
-            {d.followUps.slice(0, 6).map((l) => (
-              <li key={l.id}>
-                <Link href={`/f/${l.firm.slug}/leads/${l.id}`} className="group flex items-start gap-3">
-                  <DayNumber value={l.followUpAt} overdue={l.overdue} />
+            {upcoming.slice(0, 8).map((u) => (
+              <li key={u.key}>
+                <Link href={u.href} className="group flex items-start gap-3">
+                  {typeof u.when === "string" ? (
+                    <span className={cn("w-9 shrink-0 font-display text-[30px] leading-none", u.overdue ? "text-danger" : "text-hub-red-deep")} aria-hidden="true">{Number(u.when.slice(8))}</span>
+                  ) : (
+                    <DayNumber value={u.when} overdue={u.overdue} />
+                  )}
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-ink group-hover:underline">Follow up {l.name}</span>
+                    <span className="block truncate text-sm font-semibold text-ink group-hover:underline">{u.title}</span>
                     <span className="mt-0.5 block text-xs text-muted">
-                      {l.overdue ? "Overdue · " : ""}{l.firm.name} · <LocalTime value={l.followUpAt} mode="relative" />
+                      {u.overdue ? "Overdue · " : ""}{u.sub} · {typeof u.when === "string" ? u.when : <LocalTime value={u.when} mode="relative" />}
                     </span>
                   </span>
                 </Link>
@@ -186,9 +203,9 @@ export default async function TodayPage() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted">No follow-ups on your leads before the end of tomorrow.</p>
+          <p className="text-sm text-muted">Nothing due on your matters, tasks or leads in the next few days.</p>
         )}
-        <p className="mt-auto border-t border-hairline pt-3 text-xs text-muted">Consultations, submissions and deadlines join this list when Tasks &amp; Calendar arrives (Milestone 2).</p>
+        <Link href="/calendar" className="mt-auto border-t border-hairline pt-3 text-[13px] font-medium text-ink-2 hover:text-ink">Open the calendar →</Link>
       </section>
     </div>
   );

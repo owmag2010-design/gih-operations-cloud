@@ -53,6 +53,14 @@ export default async function SettingsPage({ params }: PageProps<"/f/[firmSlug]/
           <StageEditor firmSlug={firm.slug} canManage={canManage} stages={stages.map((s) => ({ id: s.id, name: s.name, category: s.category, isActive: s.isActive }))} />
         </Panel>
 
+        <Link href={`/f/${firm.slug}/settings/matters`} id="matters" className="flex items-center justify-between rounded-2xl border border-hairline bg-surface px-5 py-4 hover:border-hairline-strong">
+          <span>
+            <span className="block text-sm font-semibold text-ink">Matters</span>
+            <span className="block text-[13px] text-muted">Stages by service, task templates and validated deadline rules.</span>
+          </span>
+          <span className="text-[13px] text-ink-2">Open →</span>
+        </Link>
+
         <div className="grid gap-5 lg:grid-cols-2">
           <Panel>
             <PanelHeader title="Offices" description="Global Immigration Hub centres this firm works from." />

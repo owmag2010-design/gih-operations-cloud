@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 import type { ActionResult } from "@/server/errors";
@@ -15,12 +15,14 @@ export function SubmitButton({ children, pendingText, ...props }: ButtonProps & 
   );
 }
 
+/** Results already toasted, so a form that remounts (e.g. a reopened dialog) doesn't toast again. */
+const toasted = new WeakSet<object>();
+
 /** Shows an action's error, or toasts its success message once. */
 export function ActionFeedback({ state, successToast = true }: { state: ActionResult<unknown> | null; successToast?: boolean }) {
-  const shown = useRef<unknown>(null);
   useEffect(() => {
-    if (state && state.ok && state.message && successToast && shown.current !== state) {
-      shown.current = state;
+    if (state && state.ok && state.message && successToast && !toasted.has(state)) {
+      toasted.add(state);
       toast.success(state.message);
     }
   }, [state, successToast]);
@@ -57,7 +59,7 @@ const noopSubscribe = () => () => {};
 export function LocalTime({ value, mode = "datetime" }: { value: Date | string | null | undefined; mode?: "datetime" | "date" | "relative" }) {
   // Format only in the browser so times show in the viewer's own time zone.
   const isClient = useSyncExternalStore(noopSubscribe, () => true, () => false);
-  if (!value) return <span className="text-muted/70">—</span>;
+  if (!value) return <span className="text-muted">—</span>;
   const d = new Date(value);
   const text = !isClient
     ? ""

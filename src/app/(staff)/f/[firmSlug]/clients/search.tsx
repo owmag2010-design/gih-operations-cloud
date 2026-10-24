@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/primitives";
 
-export function ClientSearch({ initial }: { initial: string }) {
+export function ClientSearch({ initial, label = "Search clients", placeholder = "Name, email, phone, reference" }: { initial: string; label?: string; placeholder?: string }) {
   const [q, setQ] = useState(initial);
   const router = useRouter();
   const pathname = usePathname();
@@ -23,9 +23,9 @@ export function ClientSearch({ initial }: { initial: string }) {
   }, [q, params, pathname, router]);
   return (
     <label className="relative w-full sm:w-64">
-      <span className="sr-only">Search clients</span>
+      <span className="sr-only">{label}</span>
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted" />
-      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, email, phone, reference" className="h-8 pl-8 text-[13px]" />
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} className="h-8 pl-8 text-[13px]" />
     </label>
   );
 }

@@ -44,5 +44,10 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L34 | Gmail's `gmail.modify` scope is "restricted": for personal Gmail accounts Google requires app verification; in testing mode refresh tokens expire after 7 days | Personal Gmail connections would need reconnecting weekly until verified | Use Google Workspace accounts (internal app) or complete verification |
 | L35 | Microsoft 365 bought through GoDaddy can block third-party app consent | Connecting hello@thegih.com may need GoDaddy/Microsoft admin consent | Grant admin consent in Entra ID; if blocked, keep forwarding for that mailbox |
 | L36 | Search matches subjects, people and message text with simple pattern matching | Fine at current volumes; slower at hundreds of thousands of messages | Full-text index when needed |
-| L37 | "Coming up" on My day lists lead follow-ups only | Consultations, submissions and deadlines are not shown yet | Tasks & Calendar (Milestone 2) |
+| L37 | Task reminders appear in the app only (My day, Tasks) | No email or phone reminder is sent | Reminder emails via Resend once staff notification preferences exist |
 | L38 | Before the page hydrates, menus and dialogs opened very early use the Hub accent | Cosmetic, lasts well under a second | None needed |
+| L39 | External calendars (Microsoft 365, Google) aren't connected | Events created in Outlook or Google Calendar don't appear; app events aren't pushed out | Add calendar scopes to the existing mail connections; `calendar_events.external_source/external_id` already prevents duplicates |
+| L40 | Business-day deadlines skip weekends only | Public holidays are not excluded; the basis text says so | Holiday calendars per jurisdiction, reviewed by each practice |
+| L41 | No deadline rules are pre-loaded | Calculated deadlines need a practice administrator to add and validate each rule with its source | By design: rules must come from the practice, not from the software |
+| L42 | Client-visible notes are only classified | There is no client portal yet to show them in | Client portal (Milestone 4) |
+| L43 | Matter checklists, documents and fees per matter aren't built | The matter shows the linked proposal only | Documents and finance (Milestone 3) |

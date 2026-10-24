@@ -62,6 +62,7 @@ const STARTER_TEMPLATES: { name: string; category: string; subject: string; preh
 ];
 import * as s from "../src/server/db/schema";
 import { DEFAULT_PIPELINE } from "../src/server/modules/crm/pipeline-defaults";
+import { DEFAULT_MATTER_STAGES } from "../src/server/modules/matters/defaults";
 import { parseFeeSchedule } from "../src/server/modules/services/fee-schedule";
 
 const FIRMS = [
@@ -147,6 +148,13 @@ export async function runSeed(db: NodePgDatabase<typeof s>, log: (m: string) => 
       // Pipeline stages
       for (const [i, st] of DEFAULT_PIPELINE.entries()) {
         await tx.insert(s.pipelineStages).values({ firmId: firm.id, key: st.key, name: st.name, category: st.category, position: i }).onConflictDoNothing();
+      }
+      // Default matter stages (only when the practice has none yet, so edits are kept)
+      const [hasStages] = await tx.select({ id: s.matterStages.id }).from(s.matterStages).where(eq(s.matterStages.firmId, firm.id)).limit(1);
+      if (!hasStages) {
+        for (const [i, st] of DEFAULT_MATTER_STAGES.entries()) {
+          await tx.insert(s.matterStages).values({ firmId: firm.id, key: st.key, name: st.name, category: st.category, position: i }).onConflictDoNothing();
+        }
       }
     }
 

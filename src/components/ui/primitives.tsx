@@ -149,7 +149,7 @@ export function Facts({ items }: { items: [string, React.ReactNode][] }) {
       {items.map(([k, v]) => (
         <React.Fragment key={k}>
           <dt className="text-muted">{k}</dt>
-          <dd className="min-w-0 break-words text-ink">{v || <span className="text-muted/70">Not recorded</span>}</dd>
+          <dd className="min-w-0 break-words text-ink">{v || <span className="text-muted">Not recorded</span>}</dd>
         </React.Fragment>
       ))}
     </dl>

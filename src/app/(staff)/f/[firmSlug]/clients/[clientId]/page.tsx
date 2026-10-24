@@ -7,10 +7,13 @@ import { countryName } from "@/lib/countries";
 import { fullName } from "@/lib/labels";
 import { NotFoundError } from "@/server/errors";
 import { getClient } from "@/server/modules/clients/clients";
+import { mattersForClient } from "@/server/modules/matters/matters";
+import { listNotes } from "@/server/modules/notes/notes";
+import { NotesPanel } from "@/components/work/notes";
+import { Lock } from "lucide-react";
 import { ComposeDialog } from "@/components/email/client";
 import { requireFirm } from "@/server/next/session";
 import { Timeline } from "../../timeline";
-import { ClientNoteForm } from "./note-form";
 
 export const metadata: Metadata = { title: "Client" };
 
@@ -26,6 +29,7 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/f
   const base = `/f/${firm.slug}`;
   const canSeeLead = ctx.has("leads:view_all", firm.firmId);
   const canEmail = ctx.has("email:send", firm.firmId);
+  const [matterRows, notes] = await Promise.all([mattersForClient(ctx, firm.firmId, client.id), listNotes(ctx, firm.firmId, { clientId: client.id })]);
 
   return (
     <>
@@ -51,13 +55,37 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/f
               <p className="max-w-[75ch] p-4 text-sm leading-relaxed whitespace-pre-wrap text-ink">{sourceLead.enquiry ?? "No enquiry text was recorded."}</p>
             </Panel>
           ) : null}
+          {matterRows ? (
+            <Panel>
+              <PanelHeader title="Matters" actions={ctx.has("matters:create", firm.firmId) ? <Button asChild size="sm" variant="primary"><Link href={`${base}/matters/new?client=${client.id}`}>Open a matter</Link></Button> : null} />
+              {matterRows.length ? (
+                <ul className="divide-y divide-hairline">
+                  {matterRows.map((m) => (
+                    <li key={m.id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <Link href={`${base}/matters/${m.id}`} className="text-sm font-medium text-ink hover:underline">{m.title}</Link>
+                        <p className="flex items-center gap-1.5 text-xs text-muted"><span className="num">{m.ref}</span> · opened <LocalTime value={m.openedAt} mode="date" />{m.restricted ? <span className="inline-flex items-center gap-0.5"><Lock className="size-3" /> Restricted</span> : null}</p>
+                      </div>
+                      <Badge tone={m.stageCategory === "closed" ? "outline" : "accent"}>{m.stageName}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="p-4 text-[13px] text-muted">No matters yet. Open one when the client goes ahead with a service.</p>}
+            </Panel>
+          ) : null}
           <Panel>
-            <PanelHeader title="Matters" />
-            <p className="p-4 text-[13px] text-muted">Immigration cases, checklists and documents for this client arrive with case management in Release 3.</p>
+            <PanelHeader title="Notes" />
+            <NotesPanel
+              slug={firm.slug}
+              subject={{ clientId: client.id }}
+              notes={notes.map((n) => ({ id: n.id, body: n.body, visibility: n.visibility, version: n.version, author: n.author, editor: n.editor, authorId: n.authorId, createdAt: n.createdAt.toISOString(), updatedAt: n.updatedAt.toISOString() }))}
+              canWrite={canEdit}
+              canModerate={ctx.has("firm:manage", firm.firmId)}
+              meId={ctx.user.id}
+            />
           </Panel>
           <Panel>
             <PanelHeader title="Activity" description="Internal: never shown to the client." />
-            {canEdit ? <div className="border-b border-hairline p-4"><ClientNoteForm firmSlug={firm.slug} clientId={client.id} /></div> : null}
             <Timeline items={timeline.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() }))} />
           </Panel>
         </div>

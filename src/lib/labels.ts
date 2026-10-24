@@ -36,12 +36,27 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   duplicate_flagged: "Possible duplicate",
   converted: "Converted to client",
   routed: "Routed from the Hub",
+  matter: "Matter",
+  task: "Task",
+  fact: "Fact",
+  date: "Date",
+  event: "Calendar",
+  people: "People",
 };
+
+export const MATTER_PERSON_ROLES: Record<string, string> = {
+  main_applicant: "Main applicant", spouse_partner: "Spouse or partner", dependant_child: "Dependent child",
+  dependant_other: "Other dependant", sponsor: "Sponsor", employer_contact: "Employer contact",
+};
+
+export const FACT_BASIS: Record<string, string> = { verified: "Verified", client_statement: "Client statement", staff_assessment: "Staff assessment" };
 
 export const FIELD_LABELS: Record<string, string> = {
   firstName: "first name", lastName: "last name", email: "email", phone: "phone", nationality: "nationality", currentCountry: "current country",
   destinationCountry: "destination", immigrationCategory: "category", enquiry: "enquiry", source: "source", sourceDetail: "source detail",
   priority: "priority", followUpAt: "follow-up", tags: "tags",
+  title: "title", legalCategory: "legal category", jurisdiction: "jurisdiction", caseManagerId: "case manager", consultantId: "consultant", restricted: "access",
+  risk: "risk", riskNote: "risk note", submissionReference: "submission reference", submissionChannel: "submission channel", submittedOn: "submission date", outcome: "outcome",
 };
 
 export const fullName = (first: string, last?: string | null) => (last ? `${first} ${last}` : first);

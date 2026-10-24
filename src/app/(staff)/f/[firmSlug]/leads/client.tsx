@@ -325,14 +325,14 @@ export function LeadsTable({
                   </td>
                   <td className={t.td}><Badge tone={STAGE_TONE[r.stageCategory]}>{r.stageName}</Badge></td>
                   <td className={cn(t.td, "max-w-[220px]")}>
-                    <div className="truncate">{r.immigrationCategory ?? <span className="text-muted/70">Not set</span>}</div>
+                    <div className="truncate">{r.immigrationCategory ?? <span className="text-muted">Not set</span>}</div>
                     <div className="truncate text-xs text-muted">
                       {[r.currentCountry ? `In ${countryName(r.currentCountry)}` : null, r.destinationCountry ? `to ${countryName(r.destinationCountry)}` : null].filter(Boolean).join(", ")}
                     </div>
                   </td>
-                  <td className={t.td}>{r.assigneeName ?? <span className="text-muted/70">Unassigned</span>}</td>
+                  <td className={t.td}>{r.assigneeName ?? <span className="text-muted">Unassigned</span>}</td>
                   <td className={t.td}><Badge tone={PRIORITY_TONE[r.priority]}>{PRIORITY_LABELS[r.priority]}</Badge></td>
-                  <td className={cn(t.td, overdue && "font-medium text-danger")}>{r.followUpAt ? <LocalTime value={r.followUpAt} mode="relative" /> : <span className="text-muted/70">None</span>}</td>
+                  <td className={cn(t.td, overdue && "font-medium text-danger")}>{r.followUpAt ? <LocalTime value={r.followUpAt} mode="relative" /> : <span className="text-muted">None</span>}</td>
                   <td className={cn(t.td, "text-ink-2")}><LocalTime value={r.createdAt} mode="date" /></td>
                 </tr>
               );

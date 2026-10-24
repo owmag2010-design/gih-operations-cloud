@@ -94,12 +94,12 @@ export class AccessContext {
   /** Row-level security scope for a transaction touching one firm. */
   scopeFor(firmId: string): Scope {
     this.firm(firmId);
-    return { orgId: this.orgId, userId: this.user.id, firmIds: [firmId] };
+    return { orgId: this.orgId, userId: this.user.id, firmIds: [firmId], matterAdminFirms: this.firmIdsWith("firm:manage").filter((f) => f === firmId) };
   }
 
   /** Scope across every firm the user belongs to (for search). */
   scopeForAllFirms(): Scope {
-    return { orgId: this.orgId, userId: this.user.id, firmIds: [...this.firms.keys()] };
+    return { orgId: this.orgId, userId: this.user.id, firmIds: [...this.firms.keys()], matterAdminFirms: this.firmIdsWith("firm:manage") };
   }
 }
 

@@ -1,5 +1,16 @@
 # Progress Log
 
+## 24 Oct 2026: Milestone 2 (part 1): matters, tasks, notes and calendar
+**Done:**
+- **Matters** under clients (`src/server/modules/matters`): open from a client or an accepted proposal; stages configurable per practice and per service (default set: opening → documents → preparation → review → submission → follow-up → outcome → closed); applicants and dependants with status and passport expiry; facts tagged verified / client statement / staff assessment (verification needs evidence and records who and when); deadlines and key dates with their basis (recorded from a document, calculated from a practice-validated rule, or adjusted with a reason and reviewer); team (case manager, consultant, members); restricted matters visible only to the team and practice administrators, enforced in PostgreSQL row-level security as well as the service; activity history.
+- **Tasks**: personal (owner only), team (unassigned, anyone in the practice can take) and assigned; linked to a matter, client or lead; priority, due date or all-day, reminder, daily/weekly/monthly/yearly repeats; task templates that fire when a matter opens or reaches a stage (once per matter). Overdue count badge in the navigation.
+- **Notes**: internal or client-visible, with full revision history, soft delete, and search limited to what the person may see. Used on matters and clients.
+- **Calendar**: month grid and agenda in the viewer's time zone; events (consultation, appointment, biometrics, interview, submission, meeting) with the event's own time zone; also shows task due dates, matter deadlines, expiry and submission dates and lead follow-ups from their own records.
+- My day now includes overdue tasks, reminders, matter deadlines in the next two weeks, and open matter counts per practice. New permissions: `matters:view_all`, `matters:view_assigned`, `matters:create`, `matters:edit`, `tasks:view_team`. Migrations 0016–0017.
+- Tests: 93 unit/integration and 12 end-to-end (including axe on the matter, tasks, calendar and matter settings pages).
+
+**Next (part 2):** Airtable read mirror and reconciliation.
+
 ## 24 Oct 2026: New interface ("Editorial Daylight")
 **Done:** Owen chose direction B from the three concepts. New top-bar shell with pill navigation and a mobile drawer; warm light palette; practice accent colours (Hub navy/red, Veritas magenta, Mimshac gold, Nextmove teal); per-person light / dark / match-device choice in the account menu (`users.ui_theme`, migration 0015); "My day" at `/today` as the landing page for everyone (greeting, what needs you, practice tiles, coming up), built only from records the person can access (`src/server/modules/today`). 81 unit/integration tests and 10 end-to-end tests (including axe in light and dark) pass.
 

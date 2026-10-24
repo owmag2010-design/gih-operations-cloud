@@ -104,10 +104,10 @@ function isActive(item: NavItem, pathname: string) {
   return pathname === path || pathname.startsWith(`${path}/`) || (item.match ?? []).some((m) => pathname === m || pathname.startsWith(`${m}/`));
 }
 
-function Badge({ n, className }: { n?: number; className?: string }) {
+function Badge({ n, className, label = "unread" }: { n?: number; className?: string; label?: string }) {
   if (!n) return null;
   return (
-    <span className={cn("min-w-5 rounded-full bg-hub-red px-1.5 text-center text-[11px] leading-5 font-semibold text-white", className)} aria-label={`${n} unread`}>
+    <span className={cn("min-w-5 rounded-full bg-hub-red px-1.5 text-center text-[11px] leading-5 font-semibold text-white", className)} aria-label={`${n} ${label}`}>
       {n > 99 ? "99+" : n}
     </span>
   );
@@ -137,7 +137,7 @@ export function TopNav({ items }: { items: NavItem[] }) {
                 className={cn(pill, active ? "bg-accent font-medium text-accent-ink" : "text-ink-2 hover:bg-sunken hover:text-ink", item.soon && !active && "text-muted")}
               >
                 {item.short ?? item.label}
-                <Badge n={item.badge} className={active ? "ring-2 ring-accent" : undefined} />
+                <Badge n={item.badge} label={item.badgeLabel} className={active ? "ring-2 ring-accent" : undefined} />
               </Link>
             </li>
           );
@@ -158,7 +158,7 @@ export function TopNav({ items }: { items: NavItem[] }) {
                           <Icon className="size-4 text-muted" />
                           <span className="flex-1">{item.label}</span>
                           {item.soon ? <span className="text-[11px] text-muted">{item.soon}</span> : null}
-                          <Badge n={item.badge} />
+                          <Badge n={item.badge} label={item.badgeLabel} />
                         </Link>
                       </DM.Item>
                     );
@@ -192,7 +192,7 @@ export function DrawerNav({ items }: { items: NavItem[] }) {
                 <Icon className="size-5 shrink-0" />
                 <span className="flex-1 truncate">{item.label}</span>
                 {item.soon ? <span className="text-[11px] opacity-80">{item.soon}</span> : null}
-                <Badge n={item.badge} />
+                <Badge n={item.badge} label={item.badgeLabel} />
               </Link>
             </li>
           );

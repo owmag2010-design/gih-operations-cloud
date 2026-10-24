@@ -1,10 +1,12 @@
 import "server-only";
-import { and, asc, count, desc, eq, inArray, isNull, lt, min } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, lt, lte, min, or, sql } from "drizzle-orm";
 import type { AccessContext } from "../../access/context";
 import { withScope } from "../../db/client";
-import { intakeItems, leads, pipelineStages, proposals } from "../../db/schema";
+import { intakeItems, leads, matterDates, matters, matterStages, pipelineStages, proposals } from "../../db/schema";
 import { inboxReach } from "../email/access";
 import { listInbox, unreadCount } from "../email/mail";
+import { canViewMatters, matterVisibility } from "../matters/matters";
+import { listTasks } from "../tasks/tasks";
 
 /**
  * "My day": what needs this person now, across every practice they belong to.
@@ -24,7 +26,11 @@ export type MyDay = {
   reviews: { id: string; ref: string; title: string; recipient: string; submittedAt: Date | null; firm: DayPractice }[] | null;
   changes: { id: string; ref: string; title: string; note: string | null; firm: DayPractice }[] | null;
   intake: { waiting: number; held: number; oldest: Date | null } | null;
-  practices: (DayPractice & { openLeads: number | null; followUpsDue: number | null; proposalsOut: number | null; inReview: number | null })[];
+  practices: (DayPractice & { openLeads: number | null; followUpsDue: number | null; proposalsOut: number | null; inReview: number | null; openMatters: number | null })[];
+  /** My open tasks that are overdue, due by the end of tomorrow, or whose reminder has come. */
+  tasks: { id: string; title: string; dueAt: Date | null; allDay: boolean; priority: string; overdue: boolean; reminded: boolean; firm: DayPractice | null; matterId: string | null; matterRef: string | null }[];
+  /** Deadlines and expiry dates in the next 14 days on matters I'm on the team for. */
+  deadlines: { id: string; label: string; kind: string; dueOn: string; matterId: string; matterRef: string; firm: DayPractice }[] | null;
 };
 
 function endOfTomorrow(now = new Date()) {
@@ -64,8 +70,8 @@ export async function myDay(ctx: AccessContext): Promise<MyDay> {
   const approveFirms = proposalFirms.filter((f) => ctx.has("proposals:approve", f.firmId));
 
   const followUps: NonNullable<MyDay["followUps"]> = [];
-  const counts = new Map<string, { openLeads: number | null; followUpsDue: number | null; proposalsOut: number | null; inReview: number | null }>();
-  for (const f of firmsList) counts.set(f.firmId, { openLeads: null, followUpsDue: null, proposalsOut: null, inReview: null });
+  const counts = new Map<string, { openLeads: number | null; followUpsDue: number | null; proposalsOut: number | null; inReview: number | null; openMatters: number | null }>();
+  for (const f of firmsList) counts.set(f.firmId, { openLeads: null, followUpsDue: null, proposalsOut: null, inReview: null, openMatters: null });
 
   await Promise.all(
     leadFirms.map((f) =>
@@ -140,6 +146,35 @@ export async function myDay(ctx: AccessContext): Promise<MyDay> {
     });
   }
 
+  // Matters: open counts per practice, and my deadlines in the next 14 days
+  const deadlines: NonNullable<MyDay["deadlines"]> = [];
+  const matterFirms = firmsList.filter((f) => canViewMatters(ctx, f.firmId));
+  const in14 = new Date(now.getTime() + 14 * 864e5).toISOString().slice(0, 10);
+  await Promise.all(
+    matterFirms.map((f) =>
+      withScope(ctx.scopeFor(f.firmId), async (tx) => {
+        const [open] = await tx.select({ n: count() }).from(matters).innerJoin(matterStages, eq(matterStages.id, matters.stageId)).where(and(...matterVisibility(ctx, f.firmId), sql`${matterStages.category} <> 'closed'`));
+        counts.get(f.firmId)!.openMatters = Number(open?.n ?? 0);
+        const rows = await tx
+          .select({ id: matterDates.id, label: matterDates.label, kind: matterDates.kind, dueOn: matterDates.dueOn, matterId: matters.id, matterRef: matters.ref })
+          .from(matterDates)
+          .innerJoin(matters, eq(matters.id, matterDates.matterId))
+          .where(and(...matterVisibility(ctx, f.firmId), isNull(matterDates.completedAt), lte(matterDates.dueOn, in14), or(eq(matters.caseManagerId, ctx.user.id), eq(matters.consultantId, ctx.user.id), sql`exists (select 1 from matter_members mm where mm.matter_id = ${matters.id} and mm.user_id = ${ctx.user.id})`)))
+          .orderBy(asc(matterDates.dueOn))
+          .limit(10);
+        for (const r of rows) deadlines.push({ ...r, firm: f });
+      }),
+    ),
+  );
+  deadlines.sort((a, b) => a.dueOn.localeCompare(b.dueOn));
+
+  // My tasks
+  const firmById = new Map(firmsList.map((f) => [f.firmId, f]));
+  const myTasks = (await listTasks(ctx, { view: "mine", status: "open" }).catch(() => []))
+    .filter((t) => (t.dueAt && t.dueAt < horizon) || (t.reminderAt && t.reminderAt <= now))
+    .slice(0, 10)
+    .map((t) => ({ id: t.id, title: t.title, dueAt: t.dueAt, allDay: t.allDay, priority: t.priority, overdue: !!t.dueAt && t.dueAt < now, reminded: !!t.reminderAt && t.reminderAt <= now, firm: t.firmId ? firmById.get(t.firmId) ?? null : null, matterId: t.matterId, matterRef: t.matterRef }));
+
   followUps.sort((a, b) => +a.followUpAt - +b.followUpAt);
   reviews.sort((a, b) => +(a.submittedAt ?? 0) - +(b.submittedAt ?? 0));
 
@@ -150,5 +185,7 @@ export async function myDay(ctx: AccessContext): Promise<MyDay> {
     changes: proposalFirms.length ? changes : null,
     intake,
     practices: firmsList.map((f) => ({ ...f, ...counts.get(f.firmId)! })),
+    tasks: myTasks,
+    deadlines: matterFirms.length ? deadlines.slice(0, 10) : null,
   };
 }
