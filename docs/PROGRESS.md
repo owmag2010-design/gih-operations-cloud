@@ -1,5 +1,18 @@
 # Progress Log
 
+## 2 Nov 2026: Client portal (Release 4, first slice)
+**Done (tested):**
+- **Client portal** (`/portal/<link>`, `src/server/modules/portal`, docs/19-client-portal.md): one private portal per matter in the Global Immigration Hub design (hero with progress ring, Overview, Journey, Documents, Messages, Your team, client card). The client signs in with a six-digit code emailed to them (15 minutes, five tries, five codes an hour, 30-day session); the link alone reveals only a first name and a masked email.
+- **Staff panel** on the matter page: open, copy, re-send, replace or close the link; document checklist (one per line, `Group: Document`), statuses Needed / Received / Accepted / Not needed; messages with internal notes the client never sees; client uploads with their Google Drive status and a retry.
+- **Uploads** are kept with the matter's files and copied into the client's Google Drive folder through a service account (`GOOGLE_SERVICE_ACCOUNT_JSON`), named by date and checklist item. Upload route handler (15 MB, PDF / images / Word), SameSite cookie plus Origin check.
+- **Alerts**: each client message or upload emails the matter team, the practice inbox and `PORTAL_ALERT_COPY`, and posts to Slack when `SLACK_PORTAL_WEBHOOK_URL` is set. Staff replies email the client a short notice with a link (the message stays in the portal).
+- **Security**: migration 0027. Client access only through `portal_*` SECURITY DEFINER functions keyed by hashed session; codes and sessions unreachable from `gih_app`; staff tables under firm RLS plus a restrictive policy that follows restricted matters.
+- Tests: 4 integration (sign-in, codes, internal notes hidden, uploads tick the checklist, alerts to team and inbox, replaced/closed links end sessions, rate limits, firm isolation), 6 unit (Drive folder links, file names, key parsing, signed assertion, multipart upload and errors) and 1 end-to-end with axe (staff open the portal, client signs in, uploads and messages, staff reply and add an internal note).
+
+**Waiting on Owen:** `portal.thegih.com` domain on Vercel and `PORTAL_URL`; Google service account key in `GOOGLE_SERVICE_ACCOUNT_JSON` and the client folders shared with it; `PORTAL_ALERT_COPY`; optional Slack webhook. Steps in docs/19-client-portal.md.
+
+**Next:** checklist templates per service, WhatsApp notice for staff replies, background Drive copies, upload scanning.
+
 ## 2 Nov 2026: Conversations from the enquiry engine (read-only, Phase B step 1)
 **Done (tested):**
 - **Conversations** (`/conversations`, `src/server/modules/conversations`): every WhatsApp, email, form and website-chat conversation the Hub enquiry engine has had, in a three-panel screen (queues and list, the whole thread across channels, the client panel with proposal and the engine instructions). Queues: client waiting, team handling, proposal out, paid, by channel, and Hub conversations not yet matched to a practice. Search by name, email, phone, matter or proposal reference; tests hidden unless asked; refreshes every 20 seconds.

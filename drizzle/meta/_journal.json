@@ -190,6 +190,13 @@
       "when": 1793610000000,
       "tag": "0026_engine_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793620000000,
+      "tag": "0027_client_portal",
+      "breakpoints": true
     }
   ]
 }

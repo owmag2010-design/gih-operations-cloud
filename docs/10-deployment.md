@@ -61,6 +61,10 @@ Environment variables in Vercel (Production):
 | `CRON_SECRET` | Any long random value (e.g. `openssl rand -hex 32`). Vercel Cron sends it to `/api/cron/mail-sync` every 5 minutes. |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET` | Azure (Entra ID) app registration for Microsoft 365 mailboxes. Optional `MS_TENANT` (default `common`). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Cloud OAuth client for Gmail / Google Workspace mailboxes. |
+| `PORTAL_URL` | Client portal base URL, e.g. `https://portal.thegih.com` (defaults to `APP_URL`). See 19-client-portal.md. |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Service account key (whole JSON file) used to copy client uploads into their Google Drive folder. |
+| `PORTAL_ALERT_COPY` | Comma-separated addresses copied on every client-portal alert (e.g. the founder). |
+| `SLACK_PORTAL_WEBHOOK_URL` | Optional Slack incoming webhook for client-portal alerts. |
 
 **Microsoft 365 (Azure portal › Microsoft Entra ID › App registrations › New registration)**
 1. Name: GIH Operations Cloud. Supported account types: "Accounts in any organizational directory" (multitenant), so Veritas, Mimshac and Hub tenants can all connect.
