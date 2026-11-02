@@ -89,7 +89,7 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 
 | # | Limitation | Impact | Plan |
 |---|---|---|---|
-| L60 | Conversations are read-only | Staff read here and reply in the engine dashboard (proposals.thegih.com/ops) | Replying, instructions and Ask Claude move here next, behind a switch |
+| L60 | Replying is on for test contacts only (`ops_cloud_send = tests`); instructions and Ask Claude are still in the engine dashboard | Real clients are answered from the engine dashboard until the switch is turned on | Turn on after Owen's check; move instructions and Ask Claude next |
 | L61 | A conversation is matched to a practice by the firm's trading name (instruction, proposal or website) | Renaming a practice in Settings would move its engine conversations to the Hub queue until the engine uses the new name | Store the engine's firm as an id when replying moves here |
 | L62 | Engine conversations are not yet linked to this app's leads and clients | The same person can appear as an engine conversation and as a lead here | Link by email and phone, then convert on deposit (Phase E) |
 | L63 | New messages appear by refreshing every 20 seconds | Up to 20 seconds' delay | Supabase Realtime |

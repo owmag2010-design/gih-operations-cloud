@@ -7,7 +7,9 @@
 - **Firm isolation**: migration 0025 adds the `ops_engine` schema with security-barrier views over the engine's tables. Each conversation is matched to a practice (Owen's instruction for that lead, then the proposal's acting firm, then the partner website it came from); practice staff with `leads:view_all` see their practice only, Hub intake (`intake:view`) sees the unmatched ones. `gih_app` can read the views but not the engine tables; the schema is not exposed to the Supabase REST API (anon/authenticated revoked). Applied to production by hand on 2 Nov (idempotent; the Database workflow re-applies it).
 - Tests: 6 integration (isolation per practice, Hub-only rows, thread order and authorship, queues, search, no direct engine access) and 2 end-to-end with axe. 115 unit/integration tests passing.
 
-**Next:** replying from Conversations (WhatsApp within the 24-hour window, email, website chat) behind an on/off switch, then instructions and Ask Claude in the client panel, then assignment and internal notes.
+**Replying (same day, migration 0026):** staff with `leads:edit` (Hub: `intake:route`) reply on WhatsApp, email or website chat from the thread. Replies go to `ops_engine.outbox` (insert/read only, own name, visible conversations only); a trigger posts each row to the engine's `engine-relay` function, which sends it with the engine dashboard's own code and records the result (a pg_cron sweep retries every minute). Engine setting `ops_cloud_send` = `off` | `tests` | `on` (set to `tests`: test contacts only). Verified live: a reply to Owen's test number was sent and marked with his name in the engine. 10 integration tests.
+
+**Next:** switch `ops_cloud_send` to `on` once Owen has used it on test contacts; then instructions and Ask Claude in the client panel, then assignment and internal notes.
 
 ## 24 Oct 2026: Milestone 3 (part 2): document workspace
 **Done (tested):**
