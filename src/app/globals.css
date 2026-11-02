@@ -1,15 +1,17 @@
 @import "tailwindcss";
 
-/* GIH Operations Cloud tokens: "Editorial Daylight" (light, default) and the dark theme. See docs/06-design-system.md. */
+/* GIH Operations Cloud tokens: "Hub Daylight" (light, default; matches thegih.com) and the dark theme. See docs/06-design-system.md. */
 :root {
-  --paper: #f4f1ec;
+  --paper: #f6f5f1;
   --surface: #ffffff;
-  --sunken: #f1ede6;
-  --hairline: #e2ddd3;
-  --hairline-strong: #d3ccbf;
-  --ink: #1d2230;
-  --ink-2: #4a5162;
-  --muted: #5f6575;
+  --sunken: #f3f2ee;
+  --hairline: #e6e7e5;
+  --hairline-strong: #d5d7d3;
+  --ink: #202326;
+  --ink-2: #474c52;
+  --muted: #60666b;
+  --elev-card: 0 1px 2px rgba(27, 38, 59, 0.04), 0 2px 8px -2px rgba(27, 38, 59, 0.06);
+  --elev-lift: 0 2px 4px rgba(27, 38, 59, 0.04), 0 16px 32px -12px rgba(27, 38, 59, 0.16);
   --navy: #1b263b;
   --navy-2: #24324c;
   --navy-3: #30405f;
@@ -66,6 +68,8 @@
   --hub-red-tint: #3a1820;
   --rail: #070c17;
   --rail-ink: #8e9ab2;
+  --elev-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --elev-lift: 0 16px 32px -12px rgba(0, 0, 0, 0.5);
 
   --accent: var(--a-dark, #dd1929);
   --accent-hover: var(--a-dark-hover, #ef3442);
@@ -97,7 +101,9 @@
     --hub-red-tint: #3a1820;
     --rail: #070c17;
     --rail-ink: #8e9ab2;
-  
+    --elev-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --elev-lift: 0 16px 32px -12px rgba(0, 0, 0, 0.5);
+
     --accent: var(--a-dark, #dd1929);
     --accent-hover: var(--a-dark-hover, #ef3442);
     --accent-soft: var(--a-dark-soft, rgba(221, 25, 41, 0.16));
@@ -140,6 +146,8 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 12px;
+  --shadow-card: var(--elev-card);
+  --shadow-lift: var(--elev-lift);
 }
 
 html { background: var(--paper); color: var(--ink); }

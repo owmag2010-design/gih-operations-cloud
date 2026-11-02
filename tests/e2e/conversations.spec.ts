@@ -17,7 +17,7 @@ test("reads engine conversations for the person's own practice only", async ({ p
   await signIn(page, "veritas.e2e@example.test");
   await page.goto("/conversations?tests=1");
   await expect(page.getByRole("heading", { name: "Conversations" })).toBeVisible();
-  await expect(page.getByText("Read-only for now")).toBeVisible();
+  await expect(page.getByText(/Replying here is on for test contacts|Read-only: to reply|Replies sent here go out/)).toBeVisible();
   const list = page.getByRole("complementary", { name: "Conversation list" });
   await expect(list.getByText("E2E Thandi Test")).toBeVisible();
   await expect(list.getByText("E2E Joyce Test")).toHaveCount(0);
@@ -25,7 +25,7 @@ test("reads engine conversations for the person's own practice only", async ({ p
   const thread = page.getByRole("list", { name: "Messages" });
   await expect(thread.getByText("I need a spouse visa")).toBeVisible();
   await expect(thread.getByText("May I have your full name?")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Reply in engine dashboard" })).toHaveAttribute("href", /proposals\.thegih\.com\/ops\/#lead=/);
+  await expect(page.getByRole("link", { name: "Open in engine dashboard" })).toHaveAttribute("href", /proposals\.thegih\.com\/ops\/#lead=/);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/conversations-veritas.png` });
   const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
   expect(axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical")).toEqual([]);

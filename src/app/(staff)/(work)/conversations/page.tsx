@@ -58,7 +58,7 @@ export default async function ConversationsPage({ searchParams }: PageProps<"/co
   const selected = detail?.conversation.id;
 
   return (
-    <div data-full-bleed className="flex h-[calc(100dvh-56px)] min-h-[560px] flex-col lg:h-[calc(100dvh-72px)]">
+    <div data-full-bleed className="flex h-[calc(100dvh-64px)] min-h-[560px] flex-col">
       <AutoRefresh seconds={20} />
       <div className="border-b border-hairline bg-paper px-4 py-2 lg:px-6">
         <Notice>

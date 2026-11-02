@@ -8,7 +8,6 @@ import {
   CalendarDays,
   ChartColumn,
   Check,
-  ChevronDown,
   Contact,
   FileText,
   FolderOpen,
@@ -20,6 +19,8 @@ import {
   Mail,
   Megaphone,
   Menu,
+  MessagesSquare,
+  ChevronsUpDown,
   Monitor,
   Moon,
   Plus,
@@ -47,7 +48,7 @@ export type UiTheme = "dark" | "light" | "system";
 const ICONS: Record<IconName, React.ComponentType<{ className?: string }>> = {
   gauge: Gauge, inbox: Inbox, route: Route, building: Building2, users: Users, scroll: ScrollText,
   contact: Contact, "user-round": UserRound, settings: Settings, layout: LayoutDashboard, "file-text": FileText, mail: Mail, templates: LayoutTemplate, "at-sign": AtSign,
-  calendar: CalendarDays, folder: FolderOpen, wallet: Wallet, book: BookOpen, megaphone: Megaphone, chart: ChartColumn, sunrise: Sunrise,
+  calendar: CalendarDays, folder: FolderOpen, wallet: Wallet, book: BookOpen, megaphone: Megaphone, chart: ChartColumn, sunrise: Sunrise, messages: MessagesSquare,
 };
 
 /* ───────── Theme ───────── */
@@ -113,92 +114,81 @@ function Badge({ n, className, label = "unread" }: { n?: number; className?: str
   );
 }
 
-/** Items shown as pills: five on large screens, seven on very wide ones. The rest sit under "More". */
-const PRIMARY_LG = 5;
-const PRIMARY_WIDE = 7;
+/** Sidebar groups, so the list reads in a few short sections. */
+const SECTIONS: { key: string; label: string | null; icons: IconName[] }[] = [
+  { key: "work", label: null, icons: ["sunrise", "gauge", "layout", "inbox", "messages", "contact"] },
+  { key: "clients", label: "Client work", icons: ["user-round", "calendar", "folder", "wallet", "file-text", "templates"] },
+  { key: "insights", label: "Insights", icons: ["chart", "book", "megaphone"] },
+];
 
-export function TopNav({ items }: { items: NavItem[] }) {
-  const pathname = usePathname();
-  const primary = items.slice(0, PRIMARY_WIDE);
-  const more = items.slice(PRIMARY_LG);
-  const moreActive = more.some((i) => isActive(i, pathname));
-  const pill = "flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm whitespace-nowrap transition-colors";
+function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
+  const Icon = ICONS[item.icon];
+  const active = isActive(item, pathname);
   return (
-    <nav aria-label="Main" className="hidden min-w-0 lg:block">
-      <ul className="flex items-center gap-1">
-        {primary.map((item, i) => {
-          const active = isActive(item, pathname);
-          return (
-            <li key={item.href} className={cn(i >= PRIMARY_LG && "hidden 2xl:block")}>
-              <Link
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                title={item.soon ? `${item.label}: arrives in ${item.soon}` : item.short ? item.label : undefined}
-                className={cn(pill, active ? "bg-accent font-medium text-accent-ink" : "text-ink-2 hover:bg-sunken hover:text-ink", item.soon && !active && "text-muted")}
-              >
-                {item.short ?? item.label}
-                <Badge n={item.badge} label={item.badgeLabel} className={active ? "ring-2 ring-accent" : undefined} />
-              </Link>
-            </li>
-          );
-        })}
-        {more.length ? (
-          <li className={cn(items.length <= PRIMARY_WIDE && "2xl:hidden")}>
-            <DM.Root>
-              <DM.Trigger className={cn(pill, moreActive ? "bg-accent font-medium text-accent-ink" : "text-ink-2 hover:bg-sunken hover:text-ink")}>
-                More <ChevronDown className="size-3.5" />
-              </DM.Trigger>
-              <DM.Portal>
-                <DM.Content align="start" sideOffset={8} className={menuContent}>
-                  {more.map((item, n) => {
-                    const Icon = ICONS[item.icon];
-                    return (
-                      <DM.Item key={item.href} asChild className={cn(n + PRIMARY_LG < PRIMARY_WIDE && "2xl:hidden")}>
-                        <Link href={item.href} className={cn(menuItem, isActive(item, pathname) && "font-semibold")}>
-                          <Icon className="size-4 text-muted" />
-                          <span className="flex-1">{item.label}</span>
-                          {item.soon ? <span className="text-[11px] text-muted">{item.soon}</span> : null}
-                          <Badge n={item.badge} label={item.badgeLabel} />
-                        </Link>
-                      </DM.Item>
-                    );
-                  })}
-                </DM.Content>
-              </DM.Portal>
-            </DM.Root>
-          </li>
-        ) : null}
-      </ul>
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      title={item.soon ? `${item.label}: arrives in ${item.soon}` : undefined}
+      className={cn(
+        "group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] transition-colors",
+        active ? "bg-accent-soft font-semibold text-ink" : "text-ink-2 hover:bg-sunken hover:text-ink",
+        item.soon && !active && "text-muted",
+      )}
+    >
+      {active ? <span className="absolute inset-y-2 -left-3 w-[3px] rounded-r-full bg-accent" aria-hidden="true" /> : null}
+      <Icon className={cn("size-[18px] shrink-0", active ? "text-accent" : "text-muted group-hover:text-ink-2")} />
+      <span className="flex-1 truncate">{item.label}</span>
+      {item.soon ? <span className="rounded-full bg-sunken px-1.5 text-[10px] font-medium text-muted">Soon</span> : null}
+      <Badge n={item.badge} label={item.badgeLabel} />
+    </Link>
+  );
+}
+
+/** The left-hand navigation: grouped sections, with Settings kept at the bottom. */
+export function SideNav({ items }: { items: NavItem[] }) {
+  const pathname = usePathname();
+  // Close the mobile drawer after moving to another page.
+  useEffect(() => {
+    const t = document.getElementById("nav-toggle") as HTMLInputElement | null;
+    if (t) t.checked = false;
+  }, [pathname]);
+  const placed = new Set<NavItem>();
+  const groups = SECTIONS.map((sec) => {
+    const list = items.filter((i) => sec.icons.includes(i.icon));
+    list.forEach((i) => placed.add(i));
+    return { ...sec, list };
+  });
+  const bottom = items.filter((i) => !placed.has(i));
+  return (
+    <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col">
+      <div className="flex-1 overflow-y-auto px-3 pb-3">
+        {groups.filter((g) => g.list.length).map((g) => (
+          <div key={g.key} className="mt-4 first:mt-1">
+            {g.label ? <p className="px-2.5 pb-1.5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">{g.label}</p> : null}
+            <ul className="flex flex-col gap-0.5">
+              {g.list.map((item) => <li key={item.href}><NavLink item={item} pathname={pathname} /></li>)}
+            </ul>
+          </div>
+        ))}
+      </div>
+      {bottom.length ? (
+        <ul className="flex flex-col gap-0.5 border-t border-hairline px-3 py-2">
+          {bottom.map((item) => <li key={item.href}><NavLink item={item} pathname={pathname} /></li>)}
+        </ul>
+      ) : null}
     </nav>
   );
 }
 
-/** Full list for the mobile drawer. */
-export function DrawerNav({ items }: { items: NavItem[] }) {
+/** The current section's name for the top bar. */
+export function PageContext({ items, workspace }: { items: NavItem[]; workspace: string }) {
   const pathname = usePathname();
+  const hit = [...items].sort((a, b) => b.href.length - a.href.length).find((i) => isActive(i, pathname));
   return (
-    <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-2">
-      <ul className="flex flex-col gap-1">
-        {items.map((item) => {
-          const Icon = ICONS[item.icon];
-          const active = isActive(item, pathname);
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={cn("flex h-11 items-center gap-3 rounded-xl px-3 text-[14px] text-ink-2 hover:bg-sunken", active && "bg-accent font-medium text-accent-ink hover:bg-accent")}
-              >
-                <Icon className="size-5 shrink-0" />
-                <span className="flex-1 truncate">{item.label}</span>
-                {item.soon ? <span className="text-[11px] opacity-80">{item.soon}</span> : null}
-                <Badge n={item.badge} label={item.badgeLabel} />
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <p className="min-w-0 truncate text-[13px] text-muted max-sm:hidden">
+      <span>{workspace}</span>
+      {hit ? <><span className="mx-1.5 text-hairline-strong">/</span><span className="font-semibold text-ink">{hit.label}</span></> : null}
+    </p>
   );
 }
 
@@ -214,15 +204,22 @@ export function WorkspaceSwitcher({ options, currentKey }: { options: WorkspaceO
   return (
     <DM.Root>
       <DM.Trigger
-        className="flex h-10 max-w-[220px] items-center gap-2 rounded-full border border-hairline-strong bg-surface px-3.5 text-[13px] font-semibold text-ink hover:border-ink-2/40"
+        className="flex w-full items-center gap-2.5 rounded-xl border border-hairline bg-surface p-2 text-left shadow-card transition-colors hover:border-hairline-strong"
         aria-label={`Workspace: ${current?.label ?? "none"}. Switch workspace`}
       >
-        <Dot color={current?.dot ?? "var(--accent)"} />
-        <span className="truncate">{current?.label ?? "No workspace"}</span>
-        <ChevronDown className="size-4 shrink-0 text-muted" />
+        {current?.kind === "firm" ? (
+          <FirmSwatch color={current.dot} label={current.label} />
+        ) : (
+          <HubMark className="size-7 shrink-0" />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block text-[10.5px] font-medium tracking-[0.06em] text-muted uppercase">Workspace</span>
+          <span className="block truncate text-[13px] font-semibold text-ink">{current?.label ?? "No workspace"}</span>
+        </span>
+        <ChevronsUpDown className="size-4 shrink-0 text-muted" />
       </DM.Trigger>
       <DM.Portal>
-        <DM.Content align="start" sideOffset={8} className={menuContent}>
+        <DM.Content align="start" sideOffset={6} className={cn(menuContent, "w-[var(--radix-dropdown-menu-trigger-width)]")}>
           <DM.Label className="px-2.5 py-1.5 text-xs text-muted">Workspaces you can open</DM.Label>
           {options.map((o) => (
             <DM.Item key={o.key} asChild>
@@ -243,7 +240,7 @@ export function NewMenu({ actions }: { actions: { label: string; href: string }[
   if (!actions.length) return null;
   return (
     <DM.Root>
-      <DM.Trigger className="flex h-10 items-center gap-2 rounded-full bg-hub-red px-4 text-sm font-semibold text-white hover:bg-hub-red-deep max-sm:w-10 max-sm:justify-center max-sm:px-0">
+      <DM.Trigger className="flex h-10 items-center gap-2 rounded-xl bg-hub-red px-4 text-sm font-semibold text-white shadow-card hover:bg-hub-red-deep max-sm:w-10 max-sm:justify-center max-sm:px-0">
         <Plus className="size-4" strokeWidth={2.5} />
         <span className="max-sm:sr-only">New</span>
       </DM.Trigger>
@@ -270,14 +267,18 @@ export function UserMenu({ name, email, initials }: { name: string; email: strin
   const { theme, setTheme } = useContext(ThemeContext);
   return (
     <DM.Root>
-      <DM.Trigger className="flex items-center gap-2.5 rounded-full border border-hairline-strong bg-surface p-1 pr-1 text-left hover:border-ink-2/40 sm:pr-3.5" aria-label={`Account menu for ${name}`}>
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-[12px] font-bold text-accent-ink" aria-hidden="true">
+      <DM.Trigger className="flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-colors hover:bg-sunken" aria-label={`Account menu for ${name}`}>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-navy text-[12px] font-bold text-white" aria-hidden="true">
           {initials}
         </span>
-        <span className="hidden text-[13px] font-semibold text-ink sm:block">{name.split(/\s+/)[0]}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-semibold text-ink">{name}</span>
+          <span className="block truncate text-[11.5px] text-muted">{email}</span>
+        </span>
+        <ChevronsUpDown className="size-4 shrink-0 text-muted" />
       </DM.Trigger>
       <DM.Portal>
-        <DM.Content align="end" sideOffset={8} className={menuContent}>
+        <DM.Content side="top" align="start" sideOffset={6} className={menuContent}>
           <div className="px-2.5 py-2">
             <p className="truncate text-[13px] font-semibold text-ink">{name}</p>
             <p className="truncate text-xs text-muted">{email}</p>

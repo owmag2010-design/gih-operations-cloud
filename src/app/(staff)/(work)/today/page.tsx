@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CalendarClock, CircleAlert, Inbox, Stamp } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { practicePalette } from "@/components/shell/theme";
 import { LocalTime } from "@/components/ui/forms";
@@ -66,22 +67,25 @@ export default async function TodayPage() {
     ...(d.followUps ?? []).map((l) => ({ key: `f-${l.id}`, when: l.followUpAt, title: `Follow up ${l.name}`, sub: l.firm.name, href: `/f/${l.firm.slug}/leads/${l.id}`, overdue: l.overdue })),
   ].sort((a, b) => (typeof a.when === "string" ? a.when : a.when.toISOString()).localeCompare(typeof b.when === "string" ? b.when : b.when.toISOString()));
 
+  const overdueTasks = d.tasks.filter((t) => t.overdue).length;
+  const approvals = (d.reviews?.length ?? 0) + (d.changes?.length ?? 0);
+  const stats: { key: string; label: string; value: number; hint: string; href: string; icon: React.ComponentType<{ className?: string }>; tone: string }[] = [
+    { key: "needs", label: "Needs you", value: list.length, hint: list.length ? "Items waiting on you" : "All clear", href: "#needs-h", icon: CircleAlert, tone: "bg-hub-red-tint text-hub-red-deep" },
+    ...(d.inbox ? [{ key: "inbox", label: "Unread in the inbox", value: d.inbox.unread, hint: d.inbox.unassignedOpen ? `${d.inbox.unassignedOpen} without an owner` : "Everything has an owner", href: "/inbox", icon: Inbox, tone: "bg-sky text-ink" }] : []),
+    { key: "tasks", label: "Overdue tasks", value: overdueTasks, hint: `${d.tasks.length} open on your list`, href: "/tasks", icon: CalendarClock, tone: overdueTasks ? "bg-warn-soft text-warn" : "bg-ok-soft text-ok" },
+    { key: "approve", label: "Proposals to review", value: approvals, hint: d.intake ? `${d.intake.waiting + d.intake.held} enquiries to route` : `${upcoming.length} dates coming up`, href: d.intake ? "/hq/intake" : "/calendar", icon: Stamp, tone: "bg-accent-soft text-accent" },
+  ];
+
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-      {/* Hero */}
-      <section className="relative overflow-hidden rounded-[28px] bg-[#0e1524] lg:col-span-12">
-        <div
-          className="absolute inset-0"
-          aria-hidden="true"
-          style={{
-            background:
-              "radial-gradient(700px 360px at 88% 120%, color-mix(in srgb, var(--a-dark, #dd1929) 55%, transparent), transparent 70%), radial-gradient(900px 400px at 0% -20%, #24324c, transparent 70%), linear-gradient(120deg, #0e1524, #1b263b)",
-          }}
-        />
-        <div className="relative flex min-h-[260px] flex-wrap items-end justify-between gap-6 px-7 py-9 sm:px-11 sm:py-10">
-          <div className="max-w-[680px]">
+    <div className="flex flex-col gap-6">
+      {/* Banner: the Hub website's Cape Town photograph under a navy wash */}
+      <section className="relative isolate overflow-hidden rounded-3xl bg-navy shadow-lift">
+        <Image src="/brand/dash-cape-town.jpg" alt="" aria-hidden="true" fill priority sizes="(min-width: 1024px) 1100px, 100vw" className="-z-10 object-cover object-[center_60%]" />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,rgba(14,21,36,.94)_0%,rgba(27,38,59,.82)_45%,rgba(27,38,59,.25)_100%)]" aria-hidden="true" />
+        <div className="flex min-h-[230px] flex-wrap items-end justify-between gap-6 px-6 py-8 sm:px-10 sm:py-9">
+          <div className="max-w-[640px]">
             <Greeting firstName={firstName} />
-            <p className="mt-4 text-[17px] leading-relaxed text-[#dfe4ee]">
+            <p className="mt-3 text-[16px] leading-relaxed text-[#dfe4ee]">
               {parts.length ? (
                 <>
                   Today:{" "}
@@ -99,12 +103,12 @@ export default async function TodayPage() {
           </div>
           <div className="flex flex-wrap gap-2.5">
             {d.inbox ? (
-              <Link href="/inbox" className="flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-[#1b263b] hover:bg-[#f4f1ec]">
+              <Link href="/inbox" className="flex h-11 items-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-navy hover:bg-sunken">
                 Open inbox{d.inbox.unread ? ` · ${d.inbox.unread} unread` : ""}
               </Link>
             ) : null}
             {ctx.has("intake:create") ? (
-              <Link href="/hq/intake/new" className="flex h-11 items-center gap-2 rounded-full bg-hub-red px-5 text-sm font-semibold text-white hover:bg-hub-red-deep">
+              <Link href="/hq/intake/new" className="flex h-11 items-center gap-2 rounded-xl bg-hub-red px-5 text-sm font-semibold text-white hover:bg-hub-red-deep">
                 Capture an enquiry
               </Link>
             ) : null}
@@ -112,119 +116,134 @@ export default async function TodayPage() {
         </div>
       </section>
 
-      {/* Needs you */}
-      <section className="flex flex-col gap-1 lg:col-span-5" aria-labelledby="needs-h">
-        <SectionTitle id="needs-h" title="Needs you" action={d.inbox ? { href: "/inbox", label: "Inbox" } : undefined} />
-        {list.length ? (
-          <ul className="flex flex-col">
-            {list.slice(0, 7).map((n, i) => (
-              <li key={n.key} className={cn(i < Math.min(list.length, 7) - 1 && "border-b border-hairline")}>
-                <Link href={n.href} className="group flex gap-3.5 py-3.5">
-                  <span className="w-1 shrink-0 rounded-full" style={{ background: bar(n.slug, n.color) }} aria-hidden="true" />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline justify-between gap-3">
-                      <span className="practice-ink truncate text-[11px] font-medium tracking-[0.08em] uppercase" style={ink(n.slug, n.color)}>{n.eyebrow}</span>
-                      {n.time ? <span className="shrink-0 text-xs text-muted"><LocalTime value={n.time} mode="relative" /></span> : null}
-                    </span>
-                    <span className="mt-1 block truncate text-[16px] font-semibold text-ink group-hover:underline group-hover:underline-offset-2">{n.title}</span>
-                    {n.detail ? <span className="mt-0.5 line-clamp-2 block text-sm text-muted">{n.detail}</span> : null}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="py-5 text-sm text-muted">
-            Nothing needs you right now.
-            {d.inbox?.unassignedOpen ? <> {plural(d.inbox.unassignedOpen, "conversation")} in the inbox {d.inbox.unassignedOpen === 1 ? "has" : "have"} no owner — <Link href="/inbox?assignee=unassigned" className="text-ink underline underline-offset-2">pick some up</Link>.</> : null}
-          </p>
-        )}
+      {/* At a glance */}
+      <section aria-label="At a glance" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        {stats.map((s) => (
+          <Link key={s.key} href={s.href} className="group flex flex-col gap-3 rounded-2xl border border-hairline bg-surface p-4 shadow-card transition-shadow hover:shadow-lift sm:p-5">
+            <span className="flex items-center justify-between">
+              <span className={cn("flex size-9 items-center justify-center rounded-xl", s.tone)} aria-hidden="true"><s.icon className="size-[18px]" /></span>
+              <ArrowRight className="size-4 text-muted opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+            </span>
+            <span>
+              <span className="num block font-display text-[34px] leading-none text-ink">{s.value}</span>
+              <span className="mt-1.5 block text-[13px] font-semibold text-ink">{s.label}</span>
+              <span className="block truncate text-xs text-muted">{s.hint}</span>
+            </span>
+          </Link>
+        ))}
       </section>
 
-      {/* Practices */}
-      <section className="flex flex-col gap-3.5 lg:col-span-4" aria-labelledby="practices-h">
-        <SectionTitle id="practices-h" title="Your practices" />
-        {d.practices.length ? (
-          <ul className="flex flex-col gap-3">
-            {d.practices.map((p) => {
-              const t = practicePalette(p.slug, p.brandColor).tile;
-              const facts = [
-                p.openMatters !== null ? plural(p.openMatters, "matter") : null,
-                p.openLeads !== null ? `${p.openLeads} leads` : null,
-                p.proposalsOut !== null ? `${plural(p.proposalsOut, "proposal")} out` : null,
-                p.followUpsDue ? `${p.followUpsDue} follow-up${p.followUpsDue === 1 ? "" : "s"} due` : null,
-              ].filter(Boolean);
-              return (
-                <li key={p.firmId}>
-                  <Link
-                    href={`/f/${p.slug}`}
-                    className="flex items-center gap-3.5 rounded-[18px] p-4 transition-transform hover:-translate-y-0.5"
-                    style={{ background: t.bg, color: t.fg, border: t.border ? `1px solid ${t.border}` : undefined }}
-                  >
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-xl font-display text-xl" style={{ background: t.mark, color: t.markInk }} aria-hidden="true">
-                      {p.name[0]}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Needs you */}
+        <section className="rounded-2xl border border-hairline bg-surface shadow-card lg:col-span-7 xl:col-span-8" aria-labelledby="needs-h">
+          <CardTitle id="needs-h" title="Needs you" count={list.length} action={d.inbox ? { href: "/inbox", label: "Open inbox" } : undefined} />
+          {list.length ? (
+            <ul className="divide-y divide-hairline">
+              {list.slice(0, 8).map((n) => (
+                <li key={n.key}>
+                  <Link href={n.href} className="group flex gap-3.5 px-5 py-3.5 transition-colors hover:bg-sunken/60">
+                    <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl text-[13px] font-semibold text-white" style={{ background: bar(n.slug, n.color) }} aria-hidden="true">
+                      {(n.title.trim()[0] ?? "•").toUpperCase()}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-semibold">{p.name}</span>
-                      <span className="block truncate text-xs" style={{ color: t.sub }}>{facts.length ? facts.join(" · ") : "Open the practice"}</span>
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span className="practice-ink truncate text-[11px] font-semibold tracking-[0.06em] uppercase" style={ink(n.slug, n.color)}>{n.eyebrow}</span>
+                        {n.time ? <span className="shrink-0 text-xs text-muted"><LocalTime value={n.time} mode="relative" /></span> : null}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[15px] font-semibold text-ink">{n.title}</span>
+                      {n.detail ? <span className="mt-0.5 line-clamp-1 block text-[13px] text-muted">{n.detail}</span> : null}
                     </span>
-                    <ArrowRight className="size-[18px] shrink-0" style={{ color: t.arrow }} aria-hidden="true" />
                   </Link>
                 </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className="py-5 text-sm text-muted">You aren&apos;t a member of a practice yet.</p>
-        )}
-      </section>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-5 py-8 text-sm text-muted">
+              Nothing needs you right now.
+              {d.inbox?.unassignedOpen ? <> {plural(d.inbox.unassignedOpen, "conversation")} in the inbox {d.inbox.unassignedOpen === 1 ? "has" : "have"} no owner — <Link href="/inbox?assignee=unassigned" className="text-ink underline underline-offset-2">pick some up</Link>.</> : null}
+            </p>
+          )}
+        </section>
 
-      {/* Coming up */}
-      <section className="flex flex-col gap-3.5 rounded-[22px] border border-hairline bg-surface p-5 lg:col-span-3" aria-labelledby="coming-h">
-        <h2 id="coming-h" className="font-display text-2xl text-ink">Coming up</h2>
-        {upcoming.length ? (
-          <ul className="flex flex-col gap-3.5">
-            {upcoming.slice(0, 8).map((u) => (
-              <li key={u.key}>
-                <Link href={u.href} className="group flex items-start gap-3">
-                  {typeof u.when === "string" ? (
-                    <span className={cn("w-9 shrink-0 font-display text-[30px] leading-none", u.overdue ? "text-danger" : "text-hub-red-deep")} aria-hidden="true">{Number(u.when.slice(8))}</span>
-                  ) : (
-                    <DayNumber value={u.when} overdue={u.overdue} />
-                  )}
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-ink group-hover:underline">{u.title}</span>
-                    <span className="mt-0.5 block text-xs text-muted">
-                      {u.overdue ? "Overdue · " : ""}{u.sub} · {typeof u.when === "string" ? u.when : <LocalTime value={u.when} mode="relative" />}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted">Nothing due on your matters, tasks or leads in the next few days.</p>
-        )}
-        <Link href="/calendar" className="mt-auto border-t border-hairline pt-3 text-[13px] font-medium text-ink-2 hover:text-ink">Open the calendar →</Link>
-      </section>
+        <div className="flex flex-col gap-6 lg:col-span-5 xl:col-span-4">
+          {/* Practices */}
+          <section className="rounded-2xl border border-hairline bg-surface shadow-card" aria-labelledby="practices-h">
+            <CardTitle id="practices-h" title="Your practices" />
+            {d.practices.length ? (
+              <ul className="flex flex-col gap-2.5 p-4 pt-1">
+                {d.practices.map((p) => {
+                  const t = practicePalette(p.slug, p.brandColor).tile;
+                  const facts = [
+                    p.openMatters !== null ? plural(p.openMatters, "matter") : null,
+                    p.openLeads !== null ? `${p.openLeads} leads` : null,
+                    p.proposalsOut !== null ? `${plural(p.proposalsOut, "proposal")} out` : null,
+                    p.followUpsDue ? `${p.followUpsDue} follow-up${p.followUpsDue === 1 ? "" : "s"} due` : null,
+                  ].filter(Boolean);
+                  return (
+                    <li key={p.firmId}>
+                      <Link
+                        href={`/f/${p.slug}`}
+                        className="flex items-center gap-3 rounded-xl p-3 transition-transform hover:-translate-y-0.5"
+                        style={{ background: t.bg, color: t.fg, border: t.border ? `1px solid ${t.border}` : undefined }}
+                      >
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg font-display text-lg" style={{ background: t.mark, color: t.markInk }} aria-hidden="true">
+                          {p.name[0]}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[14px] font-semibold">{p.name}</span>
+                          <span className="block truncate text-xs" style={{ color: t.sub }}>{facts.length ? facts.join(" · ") : "Open the practice"}</span>
+                        </span>
+                        <ArrowRight className="size-4 shrink-0" style={{ color: t.arrow }} aria-hidden="true" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="px-5 pb-5 text-sm text-muted">You aren&apos;t a member of a practice yet.</p>
+            )}
+          </section>
+
+          {/* Coming up */}
+          <section className="rounded-2xl border border-hairline bg-surface shadow-card" aria-labelledby="coming-h">
+            <CardTitle id="coming-h" title="Coming up" action={{ href: "/calendar", label: "Calendar" }} />
+            {upcoming.length ? (
+              <ul className="flex flex-col gap-1 px-3 pb-3">
+                {upcoming.slice(0, 6).map((u) => (
+                  <li key={u.key}>
+                    <Link href={u.href} className="group flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-sunken/60">
+                      <span className={cn("flex size-11 shrink-0 flex-col items-center justify-center rounded-xl font-display text-[20px] leading-none", u.overdue ? "bg-danger-soft text-danger" : "bg-hub-red-tint text-hub-red-deep")} aria-hidden="true">
+                        {typeof u.when === "string" ? Number(u.when.slice(8)) : <DayOfMonth value={u.when} />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-ink">{u.title}</span>
+                        <span className="mt-0.5 block truncate text-xs text-muted">
+                          {u.overdue ? "Overdue · " : ""}{u.sub} · {typeof u.when === "string" ? u.when : <LocalTime value={u.when} mode="relative" />}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-5 pb-5 text-sm text-muted">Nothing due on your matters, tasks or leads in the next few days.</p>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
 
-function SectionTitle({ id, title, action }: { id: string; title: string; action?: { href: string; label: string } }) {
+function CardTitle({ id, title, count, action }: { id: string; title: string; count?: number; action?: { href: string; label: string } }) {
   return (
-    <div className="flex items-baseline justify-between border-b-2 border-ink pb-2">
-      <h2 id={id} className="font-display text-[28px] leading-tight text-ink">{title}</h2>
-      {action ? <Link href={action.href} className="text-[13px] font-medium text-ink hover:text-hub-red">{action.label} →</Link> : null}
+    <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
+      <h2 id={id} className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+        {title}
+        {count ? <span className="rounded-full bg-sunken px-2 text-xs font-semibold text-ink-2">{count}</span> : null}
+      </h2>
+      {action ? <Link href={action.href} className="text-[13px] font-medium text-ink-2 hover:text-hub-red">{action.label} →</Link> : null}
     </div>
-  );
-}
-
-function DayNumber({ value, overdue }: { value: Date; overdue: boolean }) {
-  return (
-    <span className={cn("w-9 shrink-0 font-display text-[30px] leading-none", overdue ? "text-danger" : "text-hub-red-deep")} aria-hidden="true">
-      <DayOfMonth value={value} />
-    </span>
   );
 }
 

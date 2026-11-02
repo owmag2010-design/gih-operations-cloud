@@ -11,7 +11,7 @@ export function cn(...inputs: ClassValue[]) {
 /* ───────── Button ───────── */
 
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -39,7 +39,7 @@ Button.displayName = "Button";
 /* ───────── Form controls ───────── */
 
 const control =
-  "w-full rounded-md border border-hairline-strong bg-surface px-3 text-sm text-ink placeholder:text-muted/80 transition-colors hover:border-ink-2/40 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 disabled:bg-sunken aria-[invalid=true]:border-danger";
+  "w-full rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink placeholder:text-muted/80 transition-colors hover:border-ink-2/40 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 disabled:bg-sunken aria-[invalid=true]:border-danger";
 
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(({ className, ...props }, ref) => (
   <input ref={ref} className={cn(control, "h-9", className)} {...props} />
@@ -99,7 +99,7 @@ export function Badge({ tone = "neutral", className, ...props }: React.HTMLAttri
 }
 
 export function Panel({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
-  return <section className={cn("rounded-2xl border border-hairline bg-surface shadow-[0_1px_0_rgba(0,0,0,.02)]", className)} {...props} />;
+  return <section className={cn("rounded-2xl border border-hairline bg-surface shadow-card", className)} {...props} />;
 }
 
 export function PanelHeader({ title, description, actions }: { title: string; description?: React.ReactNode; actions?: React.ReactNode }) {
@@ -118,7 +118,7 @@ export function PageHeader({ title, description, actions, meta }: { title: React
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="font-display text-[28px] leading-tight text-ink">{title}</h1>
+        <h1 className="font-display text-[32px] leading-tight tracking-[-0.01em] text-ink">{title}</h1>
         {description ? <p className="mt-1 max-w-[70ch] text-sm text-muted">{description}</p> : null}
         {meta ? <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div> : null}
       </div>

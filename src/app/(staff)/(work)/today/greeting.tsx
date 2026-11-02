@@ -15,7 +15,7 @@ export function Greeting({ firstName }: { firstName: string }) {
       <p className="mb-3 min-h-5 text-[12px] font-medium tracking-[0.18em] text-[#ffb3b9] uppercase" suppressHydrationWarning>
         {d ? d.toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long" }) : " "}
       </p>
-      <h1 className="font-display text-[42px] leading-none text-white sm:text-[60px]" suppressHydrationWarning>
+      <h1 className="font-display text-[38px] leading-[1.05] text-white sm:text-[52px]" suppressHydrationWarning>
         {part}, {firstName}.
       </h1>
     </>

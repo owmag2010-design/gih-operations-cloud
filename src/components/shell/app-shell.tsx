@@ -3,7 +3,7 @@ import type { AccessContext } from "@/server/access/context";
 import { currentSession } from "@/server/next/session";
 import { HubLogo, HubMark } from "../hub-mark";
 import { CommandPalette } from "./command-palette";
-import { DeckRoot, DrawerNav, MobileNavToggle, NewMenu, TopNav, UserMenu, WorkspaceSwitcher } from "./client";
+import { DeckRoot, MobileNavToggle, NewMenu, PageContext, SideNav, UserMenu, WorkspaceSwitcher } from "./client";
 import type { FutureItem, NavItem, Workspace } from "./nav";
 import { accentVars, practicePalette } from "./theme";
 
@@ -26,12 +26,12 @@ function initialsOf(name: string) {
 }
 
 /**
- * Staff application frame ("Editorial Daylight"): a top bar with the logo,
- * pill navigation, search, the workspace switcher, quick actions and the
- * account menu, then the page. On small screens the navigation is a drawer. The practice
- * whose records are open sets the accent colour, so people always know whose
- * work they are looking at. The person's light/dark choice comes from their
- * profile.
+ * Staff application frame ("Hub Daylight", after thegih.com): a fixed left
+ * sidebar with the logo, the workspace switcher, grouped navigation and the
+ * account menu; a slim top bar with where you are, search and quick actions;
+ * then the page. On small screens the sidebar slides in as a drawer. The
+ * practice whose records are open sets the accent colour, so people always
+ * know whose work they are looking at. Light/dark comes from the profile.
  */
 export async function AppShell({
   ctx,
@@ -58,36 +58,38 @@ export async function AppShell({
     <DeckRoot theme={theme} vars={accentVars(palette)}>
       <input type="checkbox" id="nav-toggle" className="peer sr-only" aria-hidden="true" tabIndex={-1} />
       <aside
-        className="fixed inset-y-0 left-0 z-40 flex w-[280px] -translate-x-full flex-col border-r border-hairline bg-paper transition-transform peer-checked:translate-x-0 lg:hidden"
+        className="fixed inset-y-0 left-0 z-40 flex w-[264px] -translate-x-full flex-col border-r border-hairline bg-surface transition-transform peer-checked:translate-x-0 lg:translate-x-0"
         aria-label="Navigation"
       >
-        <Link href="/today" className="flex items-center px-5 pt-5 pb-4" aria-label="Global Immigration Hub: my day">
-          <HubLogo className="light-only h-[17px] w-auto" />
-          <HubLogo tone="white" className="dark-only h-[17px] w-auto" />
+        <Link href="/today" className="flex h-16 shrink-0 items-center px-5" aria-label="Global Immigration Hub: my day">
+          <HubLogo className="light-only h-[18px] w-auto" />
+          <HubLogo tone="white" className="dark-only h-[18px] w-auto" />
         </Link>
-        <DrawerNav items={nav} />
+        <div className="px-3 pb-2">
+          <WorkspaceSwitcher options={options} currentKey={current?.key ?? null} />
+        </div>
+        <SideNav items={nav} />
+        <div className="border-t border-hairline p-2">
+          <UserMenu name={ctx.user.name} email={ctx.user.email} initials={initialsOf(ctx.user.name)} />
+        </div>
       </aside>
       <label htmlFor="nav-toggle" className="fixed inset-0 z-30 hidden bg-ink/30 peer-checked:block lg:hidden" aria-hidden="true" />
-      <header className="sticky top-0 z-20 border-b border-hairline bg-paper/90 backdrop-blur-md">
-        <div className="mx-auto flex h-[72px] max-w-[1440px] items-center gap-3 px-4 lg:gap-6 lg:px-10">
-          <MobileNavToggle />
-          <Link href="/today" className="shrink-0" aria-label="Global Immigration Hub: my day">
-            <span className="max-sm:hidden">
-              <HubLogo className="light-only h-[17px] w-auto" />
-              <HubLogo tone="white" className="dark-only h-[17px] w-auto" />
-            </span>
-            <HubMark className="size-8 sm:hidden" />
-          </Link>
-          <TopNav items={nav} />
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            <CommandPalette navigation={commandNav} quickActions={quickActions ?? []} />
-            <WorkspaceSwitcher options={options} currentKey={current?.key ?? null} />
-            <NewMenu actions={quickActions ?? []} />
-            <UserMenu name={ctx.user.name} email={ctx.user.email} initials={initialsOf(ctx.user.name)} />
+      <div className="flex min-h-screen flex-1 flex-col lg:pl-[264px]">
+        <header className="sticky top-0 z-20 border-b border-hairline bg-paper/85 backdrop-blur-md">
+          <div className="flex h-16 items-center gap-3 px-4 lg:px-8">
+            <MobileNavToggle />
+            <Link href="/today" className="shrink-0 lg:hidden" aria-label="Global Immigration Hub: my day">
+              <HubMark className="size-8" />
+            </Link>
+            <PageContext items={nav} workspace={current?.label ?? "Hub"} />
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <CommandPalette navigation={commandNav} quickActions={quickActions ?? []} />
+              <NewMenu actions={quickActions ?? []} />
+            </div>
           </div>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 lg:px-10 lg:py-8 has-[[data-full-bleed]]:max-w-none has-[[data-full-bleed]]:p-0">{children}</main>
+        </header>
+        <main className="mx-auto w-full max-w-[1360px] flex-1 px-4 py-6 lg:px-8 lg:py-8 has-[[data-full-bleed]]:max-w-none has-[[data-full-bleed]]:p-0">{children}</main>
+      </div>
     </DeckRoot>
   );
 }
