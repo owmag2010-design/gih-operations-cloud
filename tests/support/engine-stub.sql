@@ -14,3 +14,4 @@ CREATE TABLE IF NOT EXISTS engine.proposals (
   slug text PRIMARY KEY, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(), lead_id uuid, status text DEFAULT 'ready', record jsonb);
 CREATE TABLE IF NOT EXISTS engine.chats (
   sid text PRIMARY KEY, lead_id uuid, site text, page text, ip_hash text, created_at timestamptz DEFAULT now(), last_seen timestamptz DEFAULT now());
+CREATE TABLE IF NOT EXISTS engine.config (key text PRIMARY KEY, value text);

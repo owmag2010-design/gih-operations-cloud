@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getConversation, listConversations, queueCounts } from "../../src/server/modules/conversations/conversations";
-import { makeUser, resetDatabase } from "../support/fixtures";
+import { getConversation, listConversations, queueCounts, queueReply } from "../../src/server/modules/conversations/conversations";
+import { auditCount, makeUser, resetDatabase } from "../support/fixtures";
 
 /**
  * Conversations are read from the enquiry engine's tables through the
@@ -104,5 +104,56 @@ describe("Conversations from the enquiry engine", () => {
     await expect(app.query("select * from engine.leads")).rejects.toThrow(/permission denied/);
     const { rows } = await app.query("select count(*)::int n from ops_engine.leads");
     expect(rows[0].n).toBe(0);
+  });
+});
+
+describe("Replying from Conversations", () => {
+  let ids: Ids;
+  beforeEach(async () => {
+    await resetDatabase();
+    await owner.query("truncate ops_engine.outbox");
+    await owner.query("insert into engine.config (key, value) values ('ops_cloud_send', 'tests') on conflict (key) do update set value = excluded.value");
+    ids = await seedEngine();
+    await owner.query("update engine.leads set phone = '27820000001' where id = $1", [ids.test]);
+  });
+
+  it("queues a reply for a test contact in the person's practice, as that person", async () => {
+    const staff = await makeUser({ name: "Vera Consultant", firms: { veritas: "immigration_consultant" } });
+    const r = await queueReply(staff, ids.test, { channel: "whatsapp", body: "Hello from the team" });
+    expect("id" in r).toBe(true);
+    const { rows } = await owner.query("select * from ops_engine.outbox");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ lead_id: ids.test, user_id: staff.user.id, user_name: "Vera Consultant", channel: "whatsapp", status: "queued" });
+    const detail = await getConversation(staff, ids.test);
+    expect(detail?.outbox.map((o) => o.status)).toEqual(["queued"]);
+    expect(await auditCount("conversation.reply_queued")).toBe(1);
+  });
+
+  it("refuses real clients while the switch is on tests, and everything when it is off", async () => {
+    const staff = await makeUser({ firms: { veritas: "immigration_consultant" } });
+    expect(await queueReply(staff, ids.veritas, { channel: "email", body: "Hi" })).toEqual({ error: expect.stringMatching(/test contacts only/) });
+    await owner.query("update engine.config set value = 'off' where key = 'ops_cloud_send'");
+    expect(await queueReply(staff, ids.test, { channel: "whatsapp", body: "Hi" })).toEqual({ error: expect.stringMatching(/switched off/) });
+    await owner.query("update engine.config set value = 'on' where key = 'ops_cloud_send'");
+    expect("id" in (await queueReply(staff, ids.veritas, { channel: "email", body: "Hi" }))).toBe(true);
+  });
+
+  it("refuses another practice's client and people without edit rights", async () => {
+    await owner.query("update engine.config set value = 'on' where key = 'ops_cloud_send'");
+    const mimshac = await makeUser({ firms: { mimshac: "immigration_consultant" } });
+    expect(await queueReply(mimshac, ids.veritas, { channel: "email", body: "Hi" })).toEqual({ error: "This conversation could not be found." });
+    const reviewer = await makeUser({ firms: { veritas: "reviewer" } });
+    expect(await queueReply(reviewer, ids.veritas, { channel: "email", body: "Hi" })).toEqual({ error: expect.stringMatching(/not reply/) });
+    expect((await getConversation(reviewer, ids.veritas))?.canReply).toBe(false);
+  });
+
+  it("keeps the app role from changing a reply's status or writing for someone else", async () => {
+    const staff = await makeUser({ firms: { veritas: "immigration_consultant" } });
+    await queueReply(staff, ids.test, { channel: "whatsapp", body: "Hello" });
+    await expect(app.query("update ops_engine.outbox set status = 'sent'")).rejects.toThrow(/permission denied/);
+    await expect(app.query(
+      `insert into ops_engine.outbox (org_id, lead_id, user_id, user_name, channel, body) values ($1, $2, $3, 'x', 'email', 'x')`,
+      [staff.orgId, ids.test, staff.user.id],
+    )).rejects.toThrow(/row-level security/);
   });
 });

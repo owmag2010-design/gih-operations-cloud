@@ -1,7 +1,8 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import type { AccessContext } from "../../access/context";
-import { withScope, type Scope } from "../../db/client";
+import { audit } from "../../audit";
+import { withScope, type Scope, type Tx } from "../../db/client";
 
 /**
  * Conversations with prospective clients, read from the Hub enquiry engine
@@ -74,12 +75,33 @@ export type ConversationProposal = {
   createdAt: Date;
 };
 
+export type OutboxItem = {
+  id: string;
+  createdAt: Date;
+  channel: string;
+  body: string;
+  reopen: boolean;
+  status: "queued" | "sending" | "sent" | "failed" | "blocked";
+  detail: string | null;
+  userName: string;
+};
+
+/** What may be sent from here, set in the engine: nothing, test contacts only, or everyone. */
+export type SendMode = "off" | "tests" | "on";
+
 export type ConversationDetail = {
   conversation: ConversationRow;
   messages: ConversationMessage[];
   proposals: ConversationProposal[];
   instructions: Record<string, unknown>;
   whatsappOpenUntil: Date | null;
+  /** Replies written here, newest last, with how the engine got on sending them. */
+  outbox: OutboxItem[];
+  sendMode: SendMode;
+  /** This person may reply here (permission and the send switch both allow it). */
+  canReply: boolean;
+  /** Why replying is not possible, when it isn't. */
+  replyBlockedReason: string | null;
 };
 
 /** Practices whose conversations this person may read, and whether they see Hub ones. */
@@ -90,6 +112,18 @@ export function conversationReach(ctx: AccessContext) {
 export function canViewConversations(ctx: AccessContext) {
   const r = conversationReach(ctx);
   return r.hub || r.firmIds.length > 0;
+}
+
+/** Replying needs `leads:edit` in the practice, or Hub intake routing for Hub conversations. */
+export function canReplyTo(ctx: AccessContext, firmId: string | null) {
+  return firmId ? ctx.has("leads:edit", firmId) : ctx.has("intake:route");
+}
+
+function replyBlocked(ctx: AccessContext, c: ConversationRow, mode: SendMode): string | null {
+  if (!canReplyTo(ctx, c.firmId)) return "You can read this conversation but not reply to it.";
+  if (mode === "off") return "Replying from here is switched off. Use the engine dashboard.";
+  if (mode === "tests" && !c.isTest) return "Replying from here is on for test contacts only while it is being checked. Use the engine dashboard for clients.";
+  return null;
 }
 
 function scope(ctx: AccessContext, firmId?: string): Scope {
@@ -215,8 +249,21 @@ export async function getConversation(ctx: AccessContext, id: string): Promise<C
     const props = (await tx.execute(sql`select * from ops_engine.proposals where lead_id = ${id} order by created_at desc`)).rows as Raw[];
     const lastWhatsappIn = msgs.filter((m) => m.channel === "whatsapp" && m.direction === "in").at(-1);
     const until = lastWhatsappIn ? new Date(date(lastWhatsappIn.created_at)!.getTime() + 24 * 3600_000) : null;
+    const outbox = (await tx.execute(sql`
+      select id, created_at, channel, body, reopen, status, detail, user_name from ops_engine.outbox
+      where lead_id = ${id} order by created_at desc limit 50`)).rows as Raw[];
+    const mode = await sendMode(tx);
+    const conversation = toRow(lead);
+    const blocked = replyBlocked(ctx, conversation, mode);
     return {
-      conversation: toRow(lead),
+      conversation,
+      sendMode: mode,
+      canReply: blocked === null,
+      replyBlockedReason: blocked,
+      outbox: outbox.reverse().map((o) => ({
+        id: String(o.id), createdAt: date(o.created_at)!, channel: String(o.channel), body: String(o.body ?? ""), reopen: o.reopen === true,
+        status: String(o.status) as OutboxItem["status"], detail: str(o.detail), userName: String(o.user_name ?? ""),
+      })),
       instructions: (lead.instructions ?? {}) as Record<string, unknown>,
       whatsappOpenUntil: until && until.getTime() > Date.now() ? until : null,
       messages: msgs.map((m) => ({
@@ -245,3 +292,43 @@ export async function getConversation(ctx: AccessContext, id: string): Promise<C
     };
   });
 }
+
+
+async function sendMode(tx: Tx): Promise<SendMode> {
+  const exists = (await tx.execute(sql`select to_regclass('ops_engine.send_switch') is not null as ok`)).rows[0] as Raw;
+  if (!exists?.ok) return "off";
+  const mode = String(((await tx.execute(sql`select mode from ops_engine.send_switch`)).rows[0] as Raw | undefined)?.mode ?? "off");
+  return mode === "on" || mode === "tests" ? mode : "off";
+}
+
+export type ReplyInput = { channel: "whatsapp" | "email" | "webchat"; body: string; subject?: string; reopen?: boolean };
+
+/**
+ * Queue a reply to a client. The engine sends it (same code as its own
+ * dashboard) and records the result on the outbox row, which this screen shows.
+ */
+export async function queueReply(ctx: AccessContext, leadId: string, input: ReplyInput): Promise<{ id: string } | { error: string }> {
+  if (!/^[0-9a-f-]{36}$/i.test(leadId)) return { error: "This conversation could not be found." };
+  if (!["whatsapp", "email", "webchat"].includes(input.channel)) return { error: "Choose WhatsApp, email or website chat." };
+  const body = input.body.trim().slice(0, 4000);
+  const subject = input.subject?.trim().slice(0, 160) || null;
+  if (!body && !input.reopen) return { error: "Write a message first." };
+  return withScope(scope(ctx), async (tx) => {
+    const lead = (await tx.execute(sql`select * from ops_engine.leads where id = ${leadId}`)).rows[0] as Raw | undefined;
+    if (!lead) return { error: "This conversation could not be found." };
+    const c = toRow(lead);
+    const blocked = replyBlocked(ctx, c, await sendMode(tx));
+    if (blocked) return { error: blocked };
+    if (input.channel === "whatsapp" && !c.phone) return { error: "There is no phone number for this client." };
+    if (input.channel === "email" && !c.email) return { error: "There is no email address for this client." };
+    const res = await tx.execute(sql`
+      insert into ops_engine.outbox (org_id, lead_id, user_id, user_name, channel, body, subject, reopen)
+      values (${ctx.orgId}, ${leadId}, ${ctx.user.id}, ${ctx.user.name}, ${input.channel}, ${body}, ${subject}, ${input.reopen === true})
+      returning id`);
+    const id = String((res.rows[0] as Raw).id);
+    await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId: c.firmId, action: "conversation.reply_queued", entityType: "engine_lead", entityId: leadId,
+      summary: `Replied by ${input.channel === "webchat" ? "website chat" : input.channel}${input.reopen ? " (WhatsApp reopen request)" : ""} to ${c.name ?? "a client"}`, data: { outboxId: id, channel: input.channel, reopen: input.reopen === true }, ip: ctx.ip }, tx);
+    return { id };
+  });
+}
+

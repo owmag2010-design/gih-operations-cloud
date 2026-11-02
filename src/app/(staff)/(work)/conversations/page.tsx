@@ -14,7 +14,7 @@ import {
   type Queue,
 } from "@/server/modules/conversations/conversations";
 import { requireStaff } from "@/server/next/session";
-import { AutoRefresh, SearchBox } from "./client";
+import { AutoRefresh, ReplyBox, SearchBox } from "./client";
 
 export const metadata: Metadata = { title: "Conversations" };
 
@@ -62,9 +62,11 @@ export default async function ConversationsPage({ searchParams }: PageProps<"/co
       <AutoRefresh seconds={20} />
       <div className="border-b border-hairline bg-paper px-4 py-2 lg:px-6">
         <Notice>
-          Read-only for now. The engine still answers clients; to reply, use{" "}
-          <a className="underline" href={selected ? `${ENGINE_DASHBOARD}#lead=${selected}` : ENGINE_DASHBOARD} target="_blank" rel="noreferrer">the engine dashboard</a>.
-          Replying from here comes next.
+          {detail?.sendMode === "on" ? "Replies sent here go out through the engine, exactly as from the engine dashboard."
+            : detail?.sendMode === "tests" ? "Replying here is on for test contacts while it is checked; for clients, use "
+            : "Read-only: to reply, use "}
+          {detail?.sendMode === "on" ? null : <a className="underline" href={selected ? `${ENGINE_DASHBOARD}#lead=${selected}` : ENGINE_DASHBOARD} target="_blank" rel="noreferrer">the engine dashboard</a>}
+          {detail?.sendMode === "on" ? null : "."} Instructions and Ask Claude are still in the engine dashboard.
         </Notice>
       </div>
       <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(300px,360px)_minmax(0,1fr)] xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)_300px]">
@@ -147,6 +149,11 @@ export default async function ConversationsPage({ searchParams }: PageProps<"/co
 
 function Thread({ detail, backHref }: { detail: ConversationDetail; backHref: string }) {
   const c = detail.conversation;
+  // Replies the engine has not confirmed (or refused); sent ones already appear as messages.
+  const pendingOut = detail.outbox.filter((o) => o.status !== "sent");
+  const channels = ([c.phone ? "whatsapp" : null, c.email ? "email" : null, c.chatLastSeen ? "webchat" : null].filter(Boolean)) as ("whatsapp" | "email" | "webchat")[];
+  const lastIn = [...detail.messages].reverse().find((m) => m.direction === "in" && (channels as string[]).includes(m.channel));
+  const defaultChannel = (lastIn?.channel ?? channels[0] ?? "email") as "whatsapp" | "email" | "webchat";
   return (
     <>
       <header className="flex items-center gap-3 border-b border-hairline bg-surface px-4 py-3 lg:px-6">
@@ -155,7 +162,7 @@ function Thread({ detail, backHref }: { detail: ConversationDetail; backHref: st
           <h2 className="truncate font-display text-xl text-ink">{c.name ?? c.email ?? (c.phone ? `+${c.phone}` : "Website visitor")}</h2>
           <p className="truncate text-xs text-muted">{[c.firmName ?? "Hub", c.siteSource ? SITE[c.siteSource] : null, c.email, c.phone ? `+${c.phone}` : null].filter(Boolean).join(" · ")}</p>
         </div>
-        <a className="shrink-0 rounded-full border border-hairline-strong px-3 py-1.5 text-[13px] font-medium text-ink hover:bg-sunken" href={`${ENGINE_DASHBOARD}#lead=${c.id}`} target="_blank" rel="noreferrer">Reply in engine dashboard</a>
+        <a className="shrink-0 rounded-full border border-hairline-strong px-3 py-1.5 text-[13px] font-medium text-ink hover:bg-sunken" href={`${ENGINE_DASHBOARD}#lead=${c.id}`} target="_blank" rel="noreferrer">Open in engine dashboard</a>
       </header>
       <ol className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-4 lg:px-6" aria-label="Messages">
         {detail.messages.length === 0 ? <li className="text-sm text-muted">No messages yet.</li> : null}
@@ -170,10 +177,25 @@ function Thread({ detail, backHref }: { detail: ConversationDetail; backHref: st
             </span>
           </li>
         ))}
+        {pendingOut.map((o) => (
+          <li key={o.id} className={cn("max-w-[82%] self-end rounded-2xl rounded-br-sm border border-dashed px-3.5 py-2.5 text-[14px] whitespace-pre-wrap break-words",
+            o.status === "failed" || o.status === "blocked" ? "border-danger bg-danger-soft text-ink" : "border-hairline-strong bg-surface text-ink-2")}>
+            {o.reopen ? `WhatsApp reopen request${o.body ? `, then: ${o.body}` : ""}` : o.body}
+            <span className="mt-1 block text-[11px] text-muted">
+              {CHANNEL[o.channel] ?? o.channel} · {o.userName} · <LocalTime value={o.createdAt} /> · {o.status === "queued" || o.status === "sending" ? "Sending…" : o.status === "blocked" ? `Not sent: ${o.detail ?? "blocked"}` : `Not sent: ${o.detail ?? "failed"}`}
+            </span>
+          </li>
+        ))}
       </ol>
-      <footer className="border-t border-hairline bg-surface px-4 py-3 text-xs text-muted lg:px-6">
-        {detail.whatsappOpenUntil ? <>WhatsApp is open until <LocalTime value={detail.whatsappOpenUntil} />. </> : c.phone ? "WhatsApp needs the approved reopen message (no client message in 24 hours). " : null}
-        Replies, instructions and Ask Claude are in the engine dashboard for now.
+      <footer className="border-t border-hairline bg-surface px-4 py-3 lg:px-6">
+        <p className="mb-2 text-xs text-muted">
+          {detail.whatsappOpenUntil ? <>WhatsApp is open until <LocalTime value={detail.whatsappOpenUntil} />. </> : c.phone ? "WhatsApp is closed (no client message in 24 hours): sending asks the client to reply first. " : null}
+        </p>
+        {detail.canReply && channels.length ? (
+          <ReplyBox key={c.id} leadId={c.id} channels={channels} defaultChannel={defaultChannel} whatsappOpen={!!detail.whatsappOpenUntil} />
+        ) : (
+          <p className="text-xs text-muted">{detail.replyBlockedReason ?? "There is no way to reach this client yet."}</p>
+        )}
       </footer>
     </>
   );
