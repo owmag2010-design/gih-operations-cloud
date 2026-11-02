@@ -176,6 +176,13 @@
       "when": 1792813140345,
       "tag": "0024_ai_safeguards",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793606400000,
+      "tag": "0025_engine_conversations",
+      "breakpoints": true
     }
   ]
 }

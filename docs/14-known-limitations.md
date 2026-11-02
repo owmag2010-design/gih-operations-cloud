@@ -84,3 +84,13 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L64 | OCR runs during the upload request (up to 60 seconds) | Large or complex images can time out and show "Couldn't read" with Read again | Background job queue |
 | L65 | Name labels cover people's names on the client and matter only; a name typed into free text that isn't recorded on the matter (e.g. an employer's director) is sent as written | Small residual exposure in free-text facts | Staff keep identifying details of third parties out of facts, or mark them sensitive |
 | L66 | "Sensitive" on a fact is ticked by staff, not detected automatically | A sensitive fact not ticked would be sent | Prompt reviewers; consider automatic detection later |
+
+## Added 2 Nov 2026 (Conversations from the enquiry engine)
+
+| # | Limitation | Impact | Plan |
+|---|---|---|---|
+| L60 | Conversations are read-only | Staff read here and reply in the engine dashboard (proposals.thegih.com/ops) | Replying, instructions and Ask Claude move here next, behind a switch |
+| L61 | A conversation is matched to a practice by the firm's trading name (instruction, proposal or website) | Renaming a practice in Settings would move its engine conversations to the Hub queue until the engine uses the new name | Store the engine's firm as an id when replying moves here |
+| L62 | Engine conversations are not yet linked to this app's leads and clients | The same person can appear as an engine conversation and as a lead here | Link by email and phone, then convert on deposit (Phase E) |
+| L63 | New messages appear by refreshing every 20 seconds | Up to 20 seconds' delay | Supabase Realtime |
+

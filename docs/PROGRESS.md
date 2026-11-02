@@ -1,5 +1,14 @@
 # Progress Log
 
+## 2 Nov 2026: Conversations from the enquiry engine (read-only, Phase B step 1)
+**Done (tested):**
+- **Conversations** (`/conversations`, `src/server/modules/conversations`): every WhatsApp, email, form and website-chat conversation the Hub enquiry engine has had, in a three-panel screen (queues and list, the whole thread across channels, the client panel with proposal and the engine instructions). Queues: client waiting, team handling, proposal out, paid, by channel, and Hub conversations not yet matched to a practice. Search by name, email, phone, matter or proposal reference; tests hidden unless asked; refreshes every 20 seconds.
+- **Read-only by design**: the engine keeps answering clients and staff reply from the engine dashboard (proposals.thegih.com/ops) until replying moves here. Nothing in the engine changed.
+- **Firm isolation**: migration 0025 adds the `ops_engine` schema with security-barrier views over the engine's tables. Each conversation is matched to a practice (Owen's instruction for that lead, then the proposal's acting firm, then the partner website it came from); practice staff with `leads:view_all` see their practice only, Hub intake (`intake:view`) sees the unmatched ones. `gih_app` can read the views but not the engine tables; the schema is not exposed to the Supabase REST API (anon/authenticated revoked). Applied to production by hand on 2 Nov (idempotent; the Database workflow re-applies it).
+- Tests: 6 integration (isolation per practice, Hub-only rows, thread order and authorship, queues, search, no direct engine access) and 2 end-to-end with axe. 115 unit/integration tests passing.
+
+**Next:** replying from Conversations (WhatsApp within the 24-hour window, email, website chat) behind an on/off switch, then instructions and Ask Claude in the client panel, then assignment and internal notes.
+
 ## 24 Oct 2026: Milestone 3 (part 2): document workspace
 **Done (tested):**
 - **Documents** (`src/server/modules/documents`, docs/18-documents.md): letters, representations, consultation reports, roadmaps, engagement documents, submission packs and precedents, linked to clients and matters (restricted matters respected in the database).

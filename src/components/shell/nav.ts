@@ -36,6 +36,7 @@ export function hqNav(ctx: AccessContext, opts: { unread?: number; tasksDue?: nu
   if (ctx.has("metrics:group")) items.push({ label: "Command Centre", short: "Command Centre", href: "/hq", icon: "gauge", exact: true });
   const anyInbox = ctx.has("intake:view") || [...ctx.firms.values()].some((f) => f.permissions.has("email:view"));
   if (anyInbox) items.push({ label: "Inbox", href: "/inbox", icon: "inbox", badge: opts.unread });
+  if (ctx.has("intake:view") || ctx.firmIdsWith("leads:view_all").length) items.push({ label: "Conversations", href: "/conversations", icon: "inbox" });
   if (ctx.has("intake:view")) items.push({ label: "Enquiries & Deals", short: "Enquiries", href: "/hq/intake", icon: "contact", match: ["/hq/routing"] });
   const matterFirms = [...ctx.firms.values()].filter((f) => f.permissions.has("matters:view_all") || f.permissions.has("matters:view_assigned"));
   if (matterFirms.length) items.push({ label: "Clients & Matters", short: "Matters", href: "/matters", icon: "user-round", match: ["/airtable"] });
@@ -56,6 +57,7 @@ export function firmNav(ctx: AccessContext, firmId: string, slug: string, opts: 
   const base = `/f/${slug}`;
   const items: NavItem[] = [{ label: "My day", href: "/today", icon: "sunrise", exact: true }, { label: "Practice overview", short: "Practice", href: base, icon: "layout", exact: true }];
   if (ctx.has("email:view", firmId)) items.push({ label: "Inbox", href: `/inbox?practice=${firmId}`, icon: "inbox", match: [`${base}/inbox`], badge: opts.unread });
+  if (ctx.has("leads:view_all", firmId)) items.push({ label: "Conversations", href: `/conversations?practice=${firmId}`, icon: "inbox", match: ["/conversations"] });
   if (ctx.has("leads:view_all", firmId) || ctx.has("leads:view_assigned", firmId)) items.push({ label: "Enquiries & Deals", short: "Enquiries", href: `${base}/leads`, icon: "contact" });
   if (ctx.has("clients:view_all", firmId) || ctx.has("clients:view_assigned", firmId)) items.push({ label: "Clients & Matters", short: "Clients & matters", href: `${base}/clients`, icon: "user-round", match: [`${base}/matters`, "/airtable"] });
   else if (ctx.has("matters:view_all", firmId) || ctx.has("matters:view_assigned", firmId)) items.push({ label: "Clients & Matters", short: "Matters", href: `${base}/matters`, icon: "user-round" });
