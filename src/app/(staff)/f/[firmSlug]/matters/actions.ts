@@ -7,6 +7,8 @@ import {
   addCalculatedDeadline, addFact, addMatterMember, addMatterStage, addRecordedDate, adjustDate, changeMatterStage, completeDate, createMatter,
   moveMatterStage, removeFact, removeMatterMember, removePerson, saveDeadlineRule, savePerson, updateMatter, updateMatterStage, validateDeadlineRule, verifyFact,
 } from "@/server/modules/matters/matters";
+import { closePortal, enablePortal, postStaffMessage, resendInvite, retryDriveUpload, updatePortalDriveFolder,
+} from "@/server/modules/portal/portal";
 import { saveTaskTemplate, setTaskTemplateActive } from "@/server/modules/tasks/tasks";
 import {
   addChecklistItem, addDocumentRequest, applyChecklist, createChecklistTemplate, newChecklistVersion, publishChecklistTemplate, removeChecklistItem,
@@ -170,4 +172,65 @@ export async function stepDocumentRequestAction(slug: string, matterId: string, 
   const step = String(form.get("kind"));
   const msg: Record<string, string> = { receive: "Marked received.", review: "Under review.", accept: "Accepted.", reject: "Replacement requested.", waive: "Waived." };
   return run(slug, (f, ctx) => stepDocumentRequest(ctx, f, matterId, requestId, data(form)), msg[step] ?? "Saved.");
+}
+
+
+export async function resendPortalInviteAction(slug: string, matterId: string): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    const s = await resendInvite(ctx, firm.firmId, matterId);
+    revalidatePath(`/f/${slug}/matters/${matterId}`);
+    return s === "failed" ? { ok: false, error: "The email didn't send. Copy the link instead." } : { ok: true, message: s === "sent" ? "Invitation emailed again." : "Email isn't connected; copy the link to the client." };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+/* ───────── Client portal ───────── */
+
+export async function enablePortalAction(slug: string, matterId: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    const r = await enablePortal(ctx, firm.firmId, matterId, data(form));
+    revalidatePath(`/f/${slug}/matters/${matterId}`);
+    const sent = r.invite === "sent" ? " Invitation emailed." : r.invite === "not_configured" ? " Email isn't connected, so copy the link to the client." : r.invite === "failed" ? " The invitation email failed; copy the link instead." : "";
+    return { ok: true, message: `Portal open.${sent}` };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+
+export async function closePortalAction(slug: string, matterId: string): Promise<ActionResult> {
+  return run(slug, (f, ctx) => closePortal(ctx, f, matterId), "Portal closed. The link no longer works.", `/f/${slug}/matters/${matterId}`);
+}
+
+export async function portalDriveFolderAction(slug: string, matterId: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  return run(slug, (f, ctx) => updatePortalDriveFolder(ctx, f, matterId, String(form.get("driveFolder") ?? "")), "Drive folder saved.", `/f/${slug}/matters/${matterId}`);
+}
+
+
+
+
+export async function portalMessageAction(slug: string, matterId: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    const r = await postStaffMessage(ctx, firm.firmId, matterId, data(form));
+    revalidatePath(`/f/${slug}/matters/${matterId}`);
+    if (r.message.internal) return { ok: true, message: "Internal note saved. The client can't see it." };
+    return { ok: true, message: r.notified === "sent" ? "Sent. The client has been emailed a link to read it." : "Sent to the portal. Email isn't connected, so the client wasn't emailed." };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+export async function retryDriveAction(slug: string, matterId: string, uploadId: string): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    const s = await retryDriveUpload(ctx, firm.firmId, matterId, uploadId);
+    revalidatePath(`/f/${slug}/matters/${matterId}`);
+    return s === "uploaded" ? { ok: true, message: "Saved to Google Drive." } : { ok: false, error: s === "not_configured" ? "Google Drive isn't connected yet." : "Drive refused the upload. Check the folder is shared with the service account." };
+  } catch (err) {
+    return toActionError(err);
+  }
 }

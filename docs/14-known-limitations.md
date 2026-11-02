@@ -93,6 +93,11 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L61 | A conversation is matched to a practice by the firm's trading name (instruction, proposal or website) | Renaming a practice in Settings would move its engine conversations to the Hub queue until the engine uses the new name | Store the engine's firm as an id when replying moves here |
 | L62 | Engine conversations are not yet linked to this app's leads and clients | The same person can appear as an engine conversation and as a lead here | Link by email and phone, then convert on deposit (Phase E) |
 | L63 | New messages appear by refreshing every 20 seconds | Up to 20 seconds' delay | Supabase Realtime |
+| L64 | Client portal: no malware scanning of client uploads yet | Files are accepted by type and size only; staff should open unexpected files with care | Add scanning (e.g. ClamAV or a provider) before uploads are opened automatically |
+| L65 | Client portal: Drive copies run while the client waits; a failed copy is retried by hand | A slow Drive call slows that upload; a failure shows "Drive failed" with a retry button | Move Drive copies to a background job with automatic retries |
+| L66 | Client portal: the checklist is typed per matter; there are no checklist templates per service yet | Staff paste the list for each new matter | Checklist templates per service (Release 3 checklists) |
+| L67 | Client portal: one portal per matter, one client email; dependants and co-applicants share it | A spouse cannot have a separate sign-in | Several portal users per matter |
+| L68 | Client portal: staff replies notify by email only (no WhatsApp) | Clients who don't read email may miss replies | Send a WhatsApp notice through the engine's outbox |
 
 
 ## Added 21 Nov 2026 (countries and jurisdictions)
@@ -113,7 +118,7 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | # | Limitation | Impact | Plan |
 |---|---|---|---|
 | L72 | No checklists are pre-loaded | Each practice writes its own per country and service, citing the source | By design: checklists come from the practice |
-| L73 | Clients can't upload against a request yet; staff upload the file and mark it received | Documents still arrive by email or WhatsApp | Client portal (next stage) |
+| L73 | Partly resolved: clients with a portal upload against their requests. Clients without a portal still send documents by email or WhatsApp | Staff upload the file and mark it received | Open a portal for the client |
 | L74 | Requests have due dates but no automatic reminders to the client | Staff chase overdue requests from My day | Reminder automation with the portal and messaging |
 | L75 | Expiry dates are recorded when a document is accepted; nothing re-requests a document when it expires | Expiring documents show in My day 90 days ahead; staff decide what to do | Automation rule "request a replacement before expiry" |
 | L76 | OCR text is not matched against the request (for example, reading a passport's expiry date) | Staff type the expiry date when accepting | Suggested fields from OCR, confirmed by staff |

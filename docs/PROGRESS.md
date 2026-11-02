@@ -1,5 +1,17 @@
 # Progress Log
 
+## 21 Nov 2026: Client portal joined to document requests (branch `client-portal-integrated`, stacked on `country-checklists`; supersedes PR #1)
+**Done (tested):**
+- The client portal from PR #1 (2 Nov entry below) now runs on top of countries and checklists. Its separate checklist (`portal_checklist_items`) is gone: the portal's Documents tab shows the matter's client-visible, non-waived **document requests**, grouped by person, with guidance, due date and the reason when a replacement is asked for.
+- A client upload against a request marks it **received** with the file, and its history records "Uploaded by the client in the portal". Requests already under review or accepted can't be uploaded to (the client is told the team is checking it). Review, accept, reject and waive stay with staff.
+- The staff portal panel summarises the requests and links to "Documents from the client". Drive copies are named after the request.
+- Migration renumbered to 0031 (after 0027–0030); `portal_uploads.request_id` has a same-firm key to `document_requests`.
+- Tests: 147 unit/integration and 21 end-to-end, all passing (the finance end-to-end test's toast contrast check is intermittently flaky, as before).
+
+**Waiting on Owen:** close PR #1 once this is merged; the portal domain and keys listed in the 2 Nov entry.
+
+**Next:** reminders and automation (overdue requests, expiring documents, client nudges through the portal), then integrations.
+
 ## 21 Nov 2026: Document checklists and requests (branch `country-checklists`, stacked on `countries-jurisdictions`)
 **Done (tested):**
 - **Checklist templates** per practice, destination country and (optionally) service (`src/server/modules/checklists`, docs/21-checklists.md): documents with who they're for (main applicant, each applicant, partner, dependants, sponsor or once per matter), required or optional, expiry tracked, shown to the client or staff only. Versioned: publishing locks a version (also in the database) and retires the previous one; a new version starts as a copy. Publishing needs the country verified by the Hub and a recorded source.
@@ -25,6 +37,19 @@
 **Waiting on Owen:** review ZA and make it operational before sending proposals from this app; confirm each practice's registered country; decide ZW currency (USD or ZWG).
 
 **Next:** country-specific workflow templates and document checklists (versioned per country and service), then the client portal.
+
+## 2 Nov 2026: Client portal (Release 4, first slice)
+**Done (tested):**
+- **Client portal** (`/portal/<link>`, `src/server/modules/portal`, docs/22-client-portal.md): one private portal per matter in the Global Immigration Hub design (hero with progress ring, Overview, Journey, Documents, Messages, Your team, client card). The client signs in with a six-digit code emailed to them (15 minutes, five tries, five codes an hour, 30-day session); the link alone reveals only a first name and a masked email.
+- **Staff panel** on the matter page: open, copy, re-send, replace or close the link; document checklist (one per line, `Group: Document`), statuses Needed / Received / Accepted / Not needed; messages with internal notes the client never sees; client uploads with their Google Drive status and a retry.
+- **Uploads** are kept with the matter's files and copied into the client's Google Drive folder through a service account (`GOOGLE_SERVICE_ACCOUNT_JSON`), named by date and checklist item. Upload route handler (15 MB, PDF / images / Word), SameSite cookie plus Origin check.
+- **Alerts**: each client message or upload emails the matter team, the practice inbox and `PORTAL_ALERT_COPY`, and posts to Slack when `SLACK_PORTAL_WEBHOOK_URL` is set. Staff replies email the client a short notice with a link (the message stays in the portal).
+- **Security**: migration 0027 (now 0031). Client access only through `portal_*` SECURITY DEFINER functions keyed by hashed session; codes and sessions unreachable from `gih_app`; staff tables under firm RLS plus a restrictive policy that follows restricted matters.
+- Tests: 4 integration (sign-in, codes, internal notes hidden, uploads tick the checklist, alerts to team and inbox, replaced/closed links end sessions, rate limits, firm isolation), 6 unit (Drive folder links, file names, key parsing, signed assertion, multipart upload and errors) and 1 end-to-end with axe (staff open the portal, client signs in, uploads and messages, staff reply and add an internal note).
+
+**Waiting on Owen:** `portal.thegih.com` domain on Vercel and `PORTAL_URL`; Google service account key in `GOOGLE_SERVICE_ACCOUNT_JSON` and the client folders shared with it; `PORTAL_ALERT_COPY`; optional Slack webhook. Steps in docs/22-client-portal.md.
+
+**Next:** checklist templates per service, WhatsApp notice for staff replies, background Drive copies, upload scanning.
 
 ## 2 Nov 2026: Conversations from the enquiry engine (read-only, Phase B step 1)
 **Done (tested):**

@@ -47,6 +47,14 @@ const schema = z.object({
   /** AI drafting (optional). Without a key, drafting assistance is switched off and says so. */
   ANTHROPIC_API_KEY: z.string().trim().optional().default(""),
   ANTHROPIC_MODEL: z.string().trim().optional().default("claude-sonnet-5-5"),
+  /** Client portal base URL (e.g. https://portal.thegih.com). Empty = APP_URL. */
+  PORTAL_URL: z.string().trim().optional().default(""),
+  /** Google service account key (the downloaded JSON) used to put client uploads in their Drive folder. Empty = Drive off. */
+  GOOGLE_SERVICE_ACCOUNT_JSON: z.string().trim().optional().default(""),
+  /** Extra address copied on every portal alert to staff (e.g. the founder). Comma-separated. */
+  PORTAL_ALERT_COPY: z.string().trim().optional().default(""),
+  /** Slack incoming webhook for portal alerts. Empty = email alerts only. */
+  SLACK_PORTAL_WEBHOOK_URL: z.string().trim().optional().default(""),
   /** Vercel Cron sends this as a bearer token to /api/cron/*. */
   CRON_SECRET: z.string().trim().optional().default(""),
 });
