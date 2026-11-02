@@ -26,10 +26,11 @@ const PRACTICES: Record<string, PracticePalette> = {
     light: { base: "#8a5d08", hover: "#9e6c0c", ink: "#ffffff" },
     tile: { bg: "#272525", fg: "#ffffff", sub: "#cfcac2", mark: "#e6a930", markInk: "#272525", arrow: "#e6a930" },
   },
+  // Nextmove Advisory: navy #1B2448 and red #ED1C24 (nextmoveza.com).
   nextmove: {
-    dark: { base: "#3aa6a0", hover: "#4dbab4", ink: "#04201e" },
-    light: { base: "#1f6f6a", hover: "#27827c", ink: "#ffffff" },
-    tile: { bg: "#ffffff", fg: "#1d2230", sub: "#5f6575", mark: "#1f6f6a", markInk: "#ffffff", arrow: "#1f6f6a", border: "#e2ddd3" },
+    dark: { base: "#ed1c24", hover: "#ff3d44", ink: "#ffffff" },
+    light: { base: "#1b2448", hover: "#2a3566", ink: "#ffffff" },
+    tile: { bg: "#1b2448", fg: "#ffffff", sub: "#c3c8dc", mark: "#ed1c24", markInk: "#ffffff", arrow: "#ff5a66" },
   },
 };
 
@@ -66,4 +67,22 @@ export function accentVars(p: PracticePalette): Record<string, string> {
     "--a-light-soft": rgba(p.light.base, 0.08),
     "--firm": p.light.base,
   };
+}
+
+/** A practice's own artwork, copied from its website (public/brand/firms). */
+export type FirmBrand = { mark: string; logo: string; logoWhite: string; logoHeight: number };
+
+const BRANDS: Record<string, FirmBrand> = {
+  veritas: { mark: "/brand/firms/veritas-mark.png", logo: "/brand/firms/veritas-logo.png", logoWhite: "/brand/firms/veritas-logo-white.png", logoHeight: 42 },
+  mimshac: { mark: "/brand/firms/mimshac-mark.png", logo: "/brand/firms/mimshac-logo.png", logoWhite: "/brand/firms/mimshac-logo-white.png", logoHeight: 38 },
+  nextmove: { mark: "/brand/firms/nextmove-mark.png", logo: "/brand/firms/nextmove-logo.svg", logoWhite: "/brand/firms/nextmove-logo-white.svg", logoHeight: 34 },
+};
+
+/** Looks a practice up by its slug or its name (e.g. "Veritas Emigrate"). */
+export function firmBrand(slugOrName: string | null | undefined): FirmBrand | null {
+  if (!slugOrName) return null;
+  const k = slugOrName.toLowerCase();
+  if (BRANDS[k]) return BRANDS[k];
+  const hit = Object.keys(BRANDS).find((b) => k.includes(b));
+  return hit ? BRANDS[hit] : null;
 }

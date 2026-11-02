@@ -182,8 +182,8 @@ body { font-family: var(--font-sans); font-size: 14px; line-height: 1.5; backgro
 
 /* Text in a practice's colour: set --c-l (light) and --c-d (dark) inline. */
 .practice-ink { color: var(--c-l); }
-[data-theme="dark"] .practice-ink { color: var(--c-d); }
-@media (prefers-color-scheme: dark) { [data-theme="system"] .practice-ink { color: var(--c-d); } }
+[data-theme="dark"] .practice-ink { color: color-mix(in srgb, var(--c-d) 62%, white); }
+@media (prefers-color-scheme: dark) { [data-theme="system"] .practice-ink { color: color-mix(in srgb, var(--c-d) 62%, white); } }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { ArrowRight, CalendarClock, CircleAlert, Inbox, Stamp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { practicePalette } from "@/components/shell/theme";
+import { FirmSwatch } from "@/components/shell/client";
+import { firmBrand, practicePalette } from "@/components/shell/theme";
 import { LocalTime } from "@/components/ui/forms";
 import { cn } from "@/components/ui/primitives";
 import { myDay, type MyDay } from "@/server/modules/today/today";
@@ -142,9 +143,13 @@ export default async function TodayPage() {
               {list.slice(0, 8).map((n) => (
                 <li key={n.key}>
                   <Link href={n.href} className="group flex gap-3.5 px-5 py-3.5 transition-colors hover:bg-sunken/60">
-                    <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl text-[13px] font-semibold text-white" style={{ background: bar(n.slug, n.color) }} aria-hidden="true">
-                      {(n.title.trim()[0] ?? "•").toUpperCase()}
-                    </span>
+                    {firmBrand(n.slug) ? (
+                      <FirmSwatch color={bar(n.slug, n.color)} label={n.slug ?? ""} slug={n.slug} className="mt-0.5 size-9 rounded-xl" />
+                    ) : (
+                      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl text-[13px] font-semibold text-white" style={{ background: bar(n.slug, n.color) }} aria-hidden="true">
+                        {(n.title.trim()[0] ?? "•").toUpperCase()}
+                      </span>
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-3">
                         <span className="practice-ink truncate text-[11px] font-semibold tracking-[0.06em] uppercase" style={ink(n.slug, n.color)}>{n.eyebrow}</span>
@@ -186,9 +191,7 @@ export default async function TodayPage() {
                         className="flex items-center gap-3 rounded-xl p-3 transition-transform hover:-translate-y-0.5"
                         style={{ background: t.bg, color: t.fg, border: t.border ? `1px solid ${t.border}` : undefined }}
                       >
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg font-display text-lg" style={{ background: t.mark, color: t.markInk }} aria-hidden="true">
-                          {p.name[0]}
-                        </span>
+                        <FirmSwatch color={t.mark} label={p.name} slug={p.slug} className="size-10 rounded-lg" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[14px] font-semibold">{p.name}</span>
                           <span className="block truncate text-xs" style={{ color: t.sub }}>{facts.length ? facts.join(" · ") : "Open the practice"}</span>

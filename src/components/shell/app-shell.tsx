@@ -3,9 +3,9 @@ import type { AccessContext } from "@/server/access/context";
 import { currentSession } from "@/server/next/session";
 import { HubLogo, HubMark } from "../hub-mark";
 import { CommandPalette } from "./command-palette";
-import { DeckRoot, MobileNavToggle, NewMenu, PageContext, SideNav, UserMenu, WorkspaceSwitcher } from "./client";
+import { DeckRoot, FirmSwatch, MobileNavToggle, NewMenu, PageContext, SideNav, UserMenu, WorkspaceSwitcher } from "./client";
 import type { FutureItem, NavItem, Workspace } from "./nav";
-import { accentVars, practicePalette } from "./theme";
+import { accentVars, firmBrand, practicePalette } from "./theme";
 
 export type WorkspaceOption = { key: string; label: string; short: string; href: string; dot: string; kind: "hq" | "firm" };
 
@@ -52,6 +52,7 @@ export async function AppShell({
   const options = workspaceOptions(ctx);
   const current = workspace.kind === "firm" ? options.find((o) => o.kind === "firm" && o.href === `/f/${workspace.slug}`) : options.find((o) => o.kind === "hq");
   const palette = workspace.kind === "firm" ? practicePalette(workspace.slug, workspace.color) : practicePalette(null);
+  const brand = workspace.kind === "firm" ? firmBrand(workspace.slug) : null;
   const commandNav = [...nav.map((n) => ({ label: n.label, href: n.href })), ...options.map((o) => ({ label: `Open ${o.label}`, href: o.href })), { label: "Your account", href: "/account" }];
 
   return (
@@ -61,10 +62,19 @@ export async function AppShell({
         className="fixed inset-y-0 left-0 z-40 flex w-[264px] -translate-x-full flex-col border-r border-hairline bg-surface transition-transform peer-checked:translate-x-0 lg:translate-x-0"
         aria-label="Navigation"
       >
-        <Link href="/today" className="flex h-16 shrink-0 items-center px-5" aria-label="Global Immigration Hub: my day">
-          <HubLogo className="light-only h-[18px] w-auto" />
-          <HubLogo tone="white" className="dark-only h-[18px] w-auto" />
-        </Link>
+        {brand && workspace.kind === "firm" ? (
+          <Link href={`/f/${workspace.slug}`} className="flex h-16 shrink-0 items-center px-5" aria-label={`${workspace.name}: practice overview`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={brand.logo} alt={workspace.name} className="light-only w-auto max-w-[200px] object-contain" style={{ height: brand.logoHeight }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={brand.logoWhite} alt={workspace.name} className="dark-only w-auto max-w-[200px] object-contain" style={{ height: brand.logoHeight }} />
+          </Link>
+        ) : (
+          <Link href="/today" className="flex h-16 shrink-0 items-center px-5" aria-label="Global Immigration Hub: my day">
+            <HubLogo className="light-only h-[18px] w-auto" />
+            <HubLogo tone="white" className="dark-only h-[18px] w-auto" />
+          </Link>
+        )}
         <div className="px-3 pb-2">
           <WorkspaceSwitcher options={options} currentKey={current?.key ?? null} />
         </div>
@@ -78,8 +88,8 @@ export async function AppShell({
         <header className="sticky top-0 z-20 border-b border-hairline bg-paper/85 backdrop-blur-md">
           <div className="flex h-16 items-center gap-3 px-4 lg:px-8">
             <MobileNavToggle />
-            <Link href="/today" className="shrink-0 lg:hidden" aria-label="Global Immigration Hub: my day">
-              <HubMark className="size-8" />
+            <Link href="/today" className="shrink-0 lg:hidden" aria-label="My day">
+              {brand && workspace.kind === "firm" ? <FirmSwatch color={palette.light.base} label={workspace.name} slug={workspace.slug} className="size-8 rounded-lg" /> : <HubMark className="size-8" />}
             </Link>
             <PageContext items={nav} workspace={current?.label ?? "Hub"} />
             <div className="ml-auto flex shrink-0 items-center gap-2">

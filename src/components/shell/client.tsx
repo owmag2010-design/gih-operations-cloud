@@ -42,6 +42,7 @@ import { HubMark } from "../hub-mark";
 import { cn } from "../ui/primitives";
 import type { WorkspaceOption } from "./app-shell";
 import type { IconName, NavItem } from "./nav";
+import { firmBrand } from "./theme";
 
 export type UiTheme = "dark" | "light" | "system";
 
@@ -195,9 +196,6 @@ export function PageContext({ items, workspace }: { items: NavItem[]; workspace:
 /* ───────── Header ───────── */
 
 
-function Dot({ color, className }: { color: string; className?: string }) {
-  return <span className={cn("inline-block size-2.5 shrink-0 rounded-full", className)} style={{ background: color }} aria-hidden="true" />;
-}
 
 export function WorkspaceSwitcher({ options, currentKey }: { options: WorkspaceOption[]; currentKey: string | null }) {
   const current = options.find((o) => o.key === currentKey) ?? options[0];
@@ -224,7 +222,7 @@ export function WorkspaceSwitcher({ options, currentKey }: { options: WorkspaceO
           {options.map((o) => (
             <DM.Item key={o.key} asChild>
               <Link href={o.href} className={menuItem}>
-                {o.kind === "firm" ? <Dot color={o.dot} /> : <HubMark className="size-4" />}
+                {o.kind === "firm" ? <FirmSwatch color={o.dot} label={o.label} small /> : <HubMark className="size-5" />}
                 <span className="flex-1 truncate">{o.label}</span>
                 {o.key === current?.key ? <Check className="size-4 text-accent" /> : null}
               </Link>
@@ -321,11 +319,18 @@ export function MobileNavToggle() {
   );
 }
 
-export function FirmSwatch({ color, label, small }: { color: string; label: string; small?: boolean }) {
+/** A practice's profile picture: its own logo mark, or its initials on its colour. */
+export function FirmSwatch({ color, label, small, slug, className }: { color: string; label: string; small?: boolean; slug?: string | null; className?: string }) {
+  const brand = firmBrand(slug ?? label);
+  const size = small ? "size-5 rounded-[5px]" : "size-7 rounded-md";
+  if (brand) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={brand.mark} alt="" aria-hidden="true" className={cn("shrink-0 object-cover", size, className)} />;
+  }
   const initials = label.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   return (
     <span
-      className={cn("flex shrink-0 items-center justify-center rounded-md font-semibold text-white ring-1 ring-white/20", small ? "size-5 text-[9px]" : "size-7 text-[11px]")}
+      className={cn("flex shrink-0 items-center justify-center font-semibold text-white ring-1 ring-white/20", small ? "text-[9px]" : "text-[11px]", size, className)}
       style={{ background: color }}
       aria-hidden="true"
     >
