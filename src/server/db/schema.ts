@@ -1684,3 +1684,62 @@ export const documentFiles = pgTable(
   },
   (t) => [index("document_files_matter_idx").on(t.matterId), index("document_files_client_idx").on(t.clientId), index("document_files_firm_idx").on(t.firmId, t.createdAt)],
 );
+
+/* ───────────────────── Client portal (release 4) ───────────────────── */
+// Client-side reads and writes go through the portal_* SECURITY DEFINER functions
+// (drizzle/0027_client_portal.sql). portal_codes and portal_sessions are not
+// reachable from the app role and so are not declared here.
+
+export const portalAccess = pgTable("portal_access", {
+  id: id(),
+  firmId: uuid("firm_id").notNull().references(() => firms.id),
+  matterId: uuid("matter_id").notNull(),
+  clientId: uuid("client_id").notNull(),
+  email: citext("email").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  tokenEnc: text("token_enc").notNull(),
+  driveFolderId: text("drive_folder_id"),
+  createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  invitedAt: timestamp("invited_at", { withTimezone: true }),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+});
+
+export const portalChecklistItems = pgTable("portal_checklist_items", {
+  id: id(),
+  firmId: uuid("firm_id").notNull().references(() => firms.id),
+  matterId: uuid("matter_id").notNull(),
+  label: text("label").notNull(),
+  groupLabel: text("group_label"),
+  status: text("status", { enum: ["needed", "uploaded", "accepted", "waived"] }).notNull().default("needed"),
+  position: integer("position").notNull().default(0),
+  createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const portalMessages = pgTable("portal_messages", {
+  id: id(),
+  firmId: uuid("firm_id").notNull().references(() => firms.id),
+  matterId: uuid("matter_id").notNull(),
+  authorKind: text("author_kind", { enum: ["client", "staff"] }).notNull(),
+  authorUserId: uuid("author_user_id").references(() => users.id, { onDelete: "set null" }),
+  internal: boolean("internal").notNull().default(false),
+  body: text("body").notNull(),
+  createdAt: createdAt(),
+});
+
+export const portalUploads = pgTable("portal_uploads", {
+  id: id(),
+  firmId: uuid("firm_id").notNull().references(() => firms.id),
+  matterId: uuid("matter_id").notNull(),
+  checklistItemId: uuid("checklist_item_id"),
+  documentFileId: uuid("document_file_id").notNull(),
+  filename: text("filename").notNull(),
+  size: integer("size").notNull(),
+  driveStatus: text("drive_status", { enum: ["pending", "uploaded", "failed", "not_configured", "no_folder"] }).notNull().default("pending"),
+  driveFileId: text("drive_file_id"),
+  driveError: text("drive_error"),
+  createdAt: createdAt(),
+});
