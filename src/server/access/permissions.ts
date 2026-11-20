@@ -23,6 +23,8 @@ export const GROUP_PERMISSIONS = [
   "mailboxes:manage",
   "mirror:view",
   "mirror:manage",
+  "countries:manage",
+  "countries:review",
 ] as const;
 
 export const FIRM_PERMISSIONS = [
@@ -94,6 +96,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "mailboxes:manage": "Manage inbound mailboxes and sending addresses",
   "mirror:view": "View the Hub's Airtable data in the mirror",
   "mirror:manage": "Manage the Airtable mirror: tables, syncs and reconciliation",
+  "countries:manage": "Edit country profiles, holiday calendars, sources and the practice-by-country checks",
+  "countries:review": "Review and verify country profiles and calendars, and make countries operational",
   "firm:view": "Open the firm workspace",
   "firm:manage": "Manage firm settings and pipeline",
   "team:view": "View firm team",

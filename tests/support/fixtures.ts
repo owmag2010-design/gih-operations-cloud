@@ -70,3 +70,8 @@ export const lead = (over: Record<string, unknown> = {}) => ({
   enquiry: "Spouse visa for my husband",
   ...over,
 });
+
+/** Set a country profile's status directly (fixtures only; the app goes through review). */
+export async function setCountryStatus(code: string, status: (typeof s.countryProfiles.$inferSelect)["status"]) {
+  await owner.update(s.countryProfiles).set({ status }).where(eq(s.countryProfiles.code, code));
+}

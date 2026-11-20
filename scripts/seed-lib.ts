@@ -171,6 +171,41 @@ export async function runSeed(db: NodePgDatabase<typeof s>, log: (m: string) => 
       for (const slug of o.firms) await tx.insert(s.firmOffices).values({ firmId: firmIds[slug], officeId: office.id }).onConflictDoNothing();
     }
 
+    // Country profiles, holiday calendars and sources: loaded as drafts for review; never overwritten.
+    {
+      type Cfg = {
+        profiles: (Omit<typeof s.countryProfiles.$inferInsert, "orgId">)[];
+        calendars: { country: string; region: string | null; name: string; sourceTitle: string; sourceUrl: string; notes: string | null; holidays: [string, string, string?][] }[];
+        sources: { country: string; kind: (typeof s.jurisdictionSources.$inferInsert)["kind"]; title: string; url: string; publisher?: string; notes?: string; effectiveFrom?: string; effectiveTo?: string }[];
+      };
+      const cfg = JSON.parse(readFileSync(join(process.cwd(), "data/config/countries.json"), "utf8")) as Cfg;
+      for (const p of cfg.profiles) {
+        const [created] = await tx.insert(s.countryProfiles).values({ ...p, orgId: org.id, status: "draft", version: 1 }).onConflictDoNothing().returning();
+        if (created) {
+          const snap: Record<string, unknown> = { ...created };
+          delete snap.createdAt;
+          delete snap.updatedAt;
+          await tx.insert(s.countryProfileVersions).values({ orgId: org.id, profileId: created.id, version: 1, status: "draft", snapshot: snap, reason: "Starting draft loaded from data/config/countries.json" });
+          log(`  + country profile ${p.code} (draft)`);
+        }
+      }
+      for (const c of cfg.calendars) {
+        const [cal] = await tx
+          .insert(s.businessCalendars)
+          .values({ orgId: org.id, countryCode: c.country, region: c.region, name: c.name, sourceTitle: c.sourceTitle, sourceUrl: c.sourceUrl, notes: c.notes, status: "draft" })
+          .onConflictDoNothing()
+          .returning();
+        if (!cal) continue;
+        await tx.insert(s.calendarHolidays).values(c.holidays.map(([date, name, sourceUrl]) => ({ orgId: org.id, calendarId: cal.id, date, name, sourceUrl: sourceUrl ?? null })));
+        log(`  + holiday calendar ${c.name} (draft, ${c.holidays.length} dates)`);
+      }
+      for (const src of cfg.sources) {
+        const [exists] = await tx.select({ id: s.jurisdictionSources.id }).from(s.jurisdictionSources).where(and(eq(s.jurisdictionSources.orgId, org.id), eq(s.jurisdictionSources.countryCode, src.country), eq(s.jurisdictionSources.url, src.url))).limit(1);
+        if (exists) continue;
+        await tx.insert(s.jurisdictionSources).values({ orgId: org.id, countryCode: src.country, kind: src.kind, title: src.title, url: src.url, publisher: src.publisher ?? null, notes: src.notes ?? null, effectiveFrom: src.effectiveFrom ?? null, effectiveTo: src.effectiveTo ?? null, status: "draft" });
+      }
+    }
+
     // Routing rules (only when none exist, so edits made in the app are kept)
     const existingRules = await tx.select({ id: s.routingRules.id }).from(s.routingRules).where(eq(s.routingRules.orgId, org.id)).limit(1);
     if (existingRules.length === 0) {

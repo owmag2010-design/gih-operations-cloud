@@ -47,7 +47,7 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L37 | Task reminders appear in the app only (My day, Tasks) | No email or phone reminder is sent | Reminder emails via Resend once staff notification preferences exist |
 | L38 | Before the page hydrates, menus and dialogs opened very early use the Hub accent | Cosmetic, lasts well under a second | None needed |
 | L39 | External calendars (Microsoft 365, Google) aren't connected | Events created in Outlook or Google Calendar don't appear; app events aren't pushed out | Add calendar scopes to the existing mail connections; `calendar_events.external_source/external_id` already prevents duplicates |
-| L40 | Business-day deadlines skip weekends only | Public holidays are not excluded; the basis text says so | Holiday calendars per jurisdiction, reviewed by each practice |
+| L40 | ~~Business-day deadlines skip weekends only~~ | Resolved 21 Nov 2026: a rule can name a verified holiday calendar (Settings › Countries); without one only weekends are skipped and the basis says so | — |
 | L41 | No deadline rules are pre-loaded | Calculated deadlines need a practice administrator to add and validate each rule with its source | By design: rules must come from the practice, not from the software |
 | L42 | Client-visible notes are only classified | There is no client portal yet to show them in | Client portal (Milestone 4) |
 | L43 | Matter checklists aren't built (documents, files and invoices now are) | No per-matter document checklist yet | Checklists by service |
@@ -94,3 +94,16 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L62 | Engine conversations are not yet linked to this app's leads and clients | The same person can appear as an engine conversation and as a lead here | Link by email and phone, then convert on deposit (Phase E) |
 | L63 | New messages appear by refreshing every 20 seconds | Up to 20 seconds' delay | Supabase Realtime |
 
+
+## Added 21 Nov 2026 (countries and jurisdictions)
+
+| # | Limitation | Impact | Plan |
+|---|---|---|---|
+| L64 | Every country profile, calendar and source starts as a draft, including South Africa | Proposals can't be sent from this app until a Hub reviewer makes ZA (and any other destination) operational | Owen reviews ZA first (about ten minutes in Settings › Countries) |
+| L65 | Holiday calendars cover 2026 and 2027 only; AU has NSW and ACT, NZ has the national list only, ZW none | Deadlines after 2027, or in other states and regions, skip weekends only | Add 2028 dates and further calendars when they are needed |
+| L66 | A deadline rule uses one calendar | NZ regional anniversary days or AU local holidays need their own calendar that includes the state or national dates | Allow a rule to combine calendars if practices need it |
+| L67 | Country profiles don't yet drive formatting (dates, addresses, phone numbers) across the app | Dates still follow the viewer's locale; addresses are free text | Use the profile's formats in forms and PDFs (next country step) |
+| L68 | Practice-by-country checks are records only | Nothing is blocked automatically when, say, payments are unavailable for a practice in a country | Enforce at the point of use (payment links, WhatsApp sends) once integrations are per entity |
+| L69 | Services carry a destination country, but checklists, workflows and fee schedules are not yet versioned per country | Stages and task templates are per practice and service, not per country | Country-specific workflow templates (Stage 2) |
+| L70 | Reviewing your own submission is allowed and recorded ("self-reviewed") | No enforced four-eyes check while the Hub has one administrator | Add a policy requiring a second reviewer once there are two |
+| L71 | Registered country per practice is not yet recorded | The practice-by-country matrix can't yet show which entity is local | Owen confirms each practice's country of registration |

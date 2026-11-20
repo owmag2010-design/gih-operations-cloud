@@ -5,6 +5,9 @@ import type { AccessContext } from "../../access/context";
 import { audit } from "../../audit";
 import { withScope, type Tx } from "../../db/client";
 import {
+  businessCalendars,
+  offices,
+  firmOffices,
   activities,
   calendarEvents,
   clients,
@@ -25,6 +28,7 @@ import { optionalCountry, optionalText, optionalUuid, parseOrThrow } from "../..
 import { nextRef } from "../refs";
 import { applyTaskTemplates } from "../tasks/tasks";
 import { addBusinessDays, addCalendarDays, isIsoDate } from "./dates";
+import { countryStatuses, verifiedHolidays } from "../countries/countries";
 
 /* ───────── Access ───────── */
 
@@ -252,12 +256,15 @@ export async function getMatter(ctx: AccessContext, firmId: string, id: string) 
       .orderBy(desc(activities.createdAt))
       .limit(200);
     const rules = await tx.select().from(deadlineRules).where(and(eq(deadlineRules.firmId, firmId), eq(deadlineRules.isActive, true))).orderBy(asc(deadlineRules.name));
+    const officeRows = await practiceOffices(tx, firmId);
+    const statuses = await countryStatuses(tx, ctx.orgId);
     return {
-      matter, client, stage, stages, service, proposal, people, events, timeline,
+      matter, client, stage, stages, service, proposal, people, events, timeline, offices: officeRows,
+      destinationStatus: matter.jurisdiction ? (statuses.get(matter.jurisdiction) ?? null) : null,
       facts: facts.map((r) => ({ ...r.f, recordedBy: r.recordedBy, verifiedBy: r.verifiedBy })),
       dates: dates.map((r) => ({ ...r.d, ruleName: r.ruleName, ruleSource: r.ruleSource, reviewedBy: r.reviewedBy })),
       team: { caseManager: matter.caseManagerId ? { id: matter.caseManagerId, name: nameOf(matter.caseManagerId) } : null, consultant: matter.consultantId ? { id: matter.consultantId, name: nameOf(matter.consultantId) } : null, members },
-      rules: rules.map((r) => ({ id: r.id, name: r.name, jurisdiction: r.jurisdiction, offsetDays: r.offsetDays, businessDays: r.businessDays, fromLabel: r.fromLabel, source: r.source, validated: !!r.validatedAt })),
+      rules: rules.map((r) => ({ id: r.id, name: r.name, jurisdiction: r.jurisdiction, offsetDays: r.offsetDays, businessDays: r.businessDays, calendarId: r.calendarId, fromLabel: r.fromLabel, source: r.source, validated: !!r.validatedAt })),
     };
   });
 }
@@ -268,11 +275,24 @@ const matterSchema = z.object({
   serviceId: optionalUuid,
   legalCategory: optionalText(120),
   jurisdiction: optionalCountry,
+  operatingOfficeId: optionalUuid,
   caseManagerId: optionalUuid,
   consultantId: optionalUuid,
   restricted: z.union([z.literal("on"), z.literal("true"), z.literal(""), z.boolean()]).optional().transform((v) => v === true || v === "on" || v === "true"),
   proposalId: optionalUuid,
 });
+
+/** The office a matter is handled from must be one of the practice's offices; its country is the operating country. */
+async function operatingOffice(tx: Tx, firmId: string, officeId: string | undefined) {
+  if (!officeId) return null;
+  const [o] = await tx
+    .select({ id: offices.id, country: offices.country })
+    .from(firmOffices)
+    .innerJoin(offices, eq(offices.id, firmOffices.officeId))
+    .where(and(eq(firmOffices.firmId, firmId), eq(firmOffices.officeId, officeId)));
+  if (!o) throw new ValidationError("Choose one of this practice's offices.", { operatingOfficeId: "Choose one of this practice's offices." });
+  return o;
+}
 
 export async function createMatter(ctx: AccessContext, firmId: string, raw: unknown) {
   ctx.require("matters:create", firmId);
@@ -294,6 +314,7 @@ export async function createMatter(ctx: AccessContext, firmId: string, raw: unkn
       const [already] = await tx.select({ ref: matters.ref }).from(matters).where(and(eq(matters.proposalId, p.id), isNull(matters.deletedAt)));
       if (already) throw new ConflictError(`This proposal already opened matter ${already.ref}.`);
     }
+    const office = await operatingOffice(tx, firmId, input.operatingOfficeId);
     const stages = await stagesFor(tx, firmId, service?.id ?? null);
     if (!stages.length) throw new ValidationError("Set up matter stages for this practice first (Settings › Matters).");
     const first = stages[0];
@@ -302,6 +323,7 @@ export async function createMatter(ctx: AccessContext, firmId: string, raw: unkn
       .values({
         firmId, clientId: client.id, ref: await nextRef(tx, firmId, ctx.firm(firmId).refPrefix, "matter"), title: input.title,
         serviceId: service?.id ?? null, legalCategory: input.legalCategory ?? service?.category ?? null, jurisdiction: input.jurisdiction ?? service?.jurisdiction ?? null,
+        operatingOfficeId: office?.id ?? null, operatingCountry: office?.country ?? null,
         stageId: first.id, caseManagerId: input.caseManagerId ?? ctx.user.id, consultantId: input.consultantId ?? client.primaryConsultantId ?? null,
         restricted: input.restricted, proposalId: input.proposalId ?? null, createdById: ctx.user.id,
       })
@@ -320,6 +342,7 @@ const updateSchema = z.object({
   title: z.string().trim().min(3, "Give the matter a short title.").max(160),
   legalCategory: optionalText(120),
   jurisdiction: optionalCountry,
+  operatingOfficeId: optionalUuid,
   caseManagerId: optionalUuid,
   consultantId: optionalUuid,
   restricted: z.union([z.literal("on"), z.literal("true"), z.literal(""), z.boolean()]).optional().transform((v) => v === true || v === "on" || v === "true"),
@@ -338,6 +361,7 @@ export async function updateMatter(ctx: AccessContext, firmId: string, id: strin
     const m = await loadVisibleMatter(tx, ctx, firmId, id, true);
     await assertMember(tx, firmId, input.caseManagerId, "caseManagerId");
     await assertMember(tx, firmId, input.consultantId, "consultantId");
+    const office = await operatingOffice(tx, firmId, input.operatingOfficeId);
     // Only the practice's administrators or the case manager may change who can see a matter.
     if (input.restricted !== m.restricted && !(ctx.has("firm:manage", firmId) || m.caseManagerId === ctx.user.id)) {
       throw new AccessDeniedError("firm:manage");
@@ -346,6 +370,7 @@ export async function updateMatter(ctx: AccessContext, firmId: string, id: strin
       .update(matters)
       .set({
         title: input.title, legalCategory: input.legalCategory ?? null, jurisdiction: input.jurisdiction ?? null,
+        operatingOfficeId: office?.id ?? null, operatingCountry: office?.country ?? null,
         caseManagerId: input.caseManagerId ?? null, consultantId: input.consultantId ?? null, restricted: input.restricted,
         risk: input.risk, riskNote: input.riskNote ?? null, submissionReference: input.submissionReference ?? null,
         submissionChannel: input.submissionChannel ?? null, submittedOn: input.submittedOn ?? null, outcome: input.outcome ?? null, updatedAt: new Date(),
@@ -517,6 +542,7 @@ const ruleSchema = z.object({
   jurisdiction: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "Choose a country."),
   offsetDays: z.coerce.number().int("Whole days only.").min(-3650).max(3650),
   businessDays: z.union([z.literal("on"), z.literal("true"), z.literal(""), z.boolean()]).optional().transform((v) => v === true || v === "on" || v === "true"),
+  calendarId: optionalUuid,
   fromLabel: z.string().trim().min(3, "Say which date the rule counts from.").max(120),
   source: z.string().trim().min(5, "Cite the source: the Act, regulation, directive or official page.").max(500),
 });
@@ -538,7 +564,13 @@ export async function saveDeadlineRule(ctx: AccessContext, firmId: string, ruleI
   ctx.require("firm:manage", firmId);
   const input = parseOrThrow(ruleSchema, raw);
   return withScope(ctx.scopeFor(firmId), async (tx) => {
-    const values = { ...input, validatedById: null, validatedAt: null, updatedAt: new Date() };
+    if (input.calendarId) {
+      if (!input.businessDays) throw new ValidationError("A holiday calendar only applies to business-day rules.", { calendarId: "Only for business-day rules." });
+      const [cal] = await tx.select({ countryCode: businessCalendars.countryCode }).from(businessCalendars).where(and(eq(businessCalendars.id, input.calendarId), eq(businessCalendars.orgId, ctx.orgId)));
+      if (!cal) throw new ValidationError("Choose a holiday calendar.", { calendarId: "Choose a holiday calendar." });
+      if (cal.countryCode !== input.jurisdiction) throw new ValidationError("Choose a calendar for the rule's country.", { calendarId: "The calendar is for a different country." });
+    }
+    const values = { ...input, calendarId: input.calendarId ?? null, validatedById: null, validatedAt: null, updatedAt: new Date() };
     const [rule] = ruleId
       ? await tx.update(deadlineRules).set(values).where(and(eq(deadlineRules.id, ruleId), eq(deadlineRules.firmId, firmId))).returning()
       : await tx.insert(deadlineRules).values({ firmId, ...values, createdById: ctx.user.id }).returning();
@@ -603,8 +635,16 @@ export async function addCalculatedDeadline(ctx: AccessContext, firmId: string, 
     const [rule] = await tx.select().from(deadlineRules).where(and(eq(deadlineRules.id, input.ruleId), eq(deadlineRules.firmId, firmId)));
     if (!rule || !rule.isActive) throw new ValidationError("Choose an active rule.", { ruleId: "Choose an active rule." });
     if (!rule.validatedAt) throw new ValidationError("This rule hasn't been validated. A practice administrator must review it first.", { ruleId: "Rule not validated." });
-    const due = rule.businessDays ? addBusinessDays(input.fromDate, rule.offsetDays) : addCalendarDays(input.fromDate, rule.offsetDays);
-    const unit = rule.businessDays ? "business days (Monday to Friday; public holidays are not excluded)" : "calendar days";
+    let holidays: ReadonlySet<string> | undefined;
+    let unit = rule.businessDays ? "business days (Monday to Friday; public holidays are not excluded)" : "calendar days";
+    if (rule.businessDays && rule.calendarId) {
+      const h = await verifiedHolidays(tx, ctx.orgId, rule.calendarId);
+      if (!h) throw new ValidationError("This rule's holiday calendar no longer exists. Edit the rule.");
+      if (!h.dates) throw new ValidationError(`The holiday calendar "${h.calendar.name}" isn't verified, so this rule can't calculate dates yet.`, { ruleId: "Holiday calendar not verified." });
+      holidays = h.dates;
+      unit = `business days (Monday to Friday, excluding public holidays in "${h.calendar.name}", verified ${h.calendar.reviewedAt?.toISOString().slice(0, 10)})`;
+    }
+    const due = rule.businessDays ? addBusinessDays(input.fromDate, rule.offsetDays, holidays) : addCalendarDays(input.fromDate, rule.offsetDays);
     const basis = `${rule.offsetDays} ${unit} from ${rule.fromLabel} (${input.fromDate}), under "${rule.name}". Source: ${rule.source}`;
     const today = new Date().toISOString().slice(0, 10);
     const [d] = await tx
@@ -681,8 +721,24 @@ export async function matterFormOptions(ctx: AccessContext, firmId: string, clie
           .from(proposals)
           .where(and(eq(proposals.firmId, firmId), eq(proposals.status, "accepted"), inArray(proposals.leadId, leadIds), sql`not exists (select 1 from matters m where m.proposal_id = ${proposals.id} and m.deleted_at is null)`))
       : [];
-    return { clients: clientRows, services: svc, team: team.rows, proposals: accepted.map((p) => ({ ...p, clientId: clientRows.find((c) => c.sourceLeadId === p.leadId)?.id ?? null })) };
+    const officeRows = await practiceOffices(tx, firmId);
+    const statuses = await countryStatuses(tx, ctx.orgId);
+    return {
+      clients: clientRows, services: svc, team: team.rows, offices: officeRows,
+      countries: [...statuses].map(([code, status]) => ({ code, status })),
+      proposals: accepted.map((p) => ({ ...p, clientId: clientRows.find((c) => c.sourceLeadId === p.leadId)?.id ?? null })),
+    };
   });
+}
+
+/** The practice's offices, for "handled from". */
+export async function practiceOffices(tx: Tx, firmId: string) {
+  return tx
+    .select({ id: offices.id, name: offices.name, country: offices.country })
+    .from(firmOffices)
+    .innerJoin(offices, eq(offices.id, firmOffices.officeId))
+    .where(eq(firmOffices.firmId, firmId))
+    .orderBy(asc(offices.name));
 }
 
 /** Open tasks on a matter (for the matter page). */

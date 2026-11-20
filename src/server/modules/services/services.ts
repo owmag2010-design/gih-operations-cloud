@@ -1,4 +1,5 @@
 import "server-only";
+import { CURRENCIES } from "@/lib/countries";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AccessContext } from "../../access/context";
@@ -16,7 +17,7 @@ export const MAX_MINOR = 1_000_000_000;
 export function parseMoney(raw: unknown): number | null {
   if (typeof raw === "number" && Number.isFinite(raw)) return raw >= 0 && raw * 100 <= MAX_MINOR ? Math.round(raw * 100) : null;
   if (typeof raw !== "string") return null;
-  const cleaned = raw.replace(/[R$A£€\s,]/gi, "").replace(/^ZAR|^AUD|^USD/i, "");
+  const cleaned = raw.replace(/^\s*(ZAR|AUD|NZD|USD|GBP|EUR|NZ\$|A\$)/i, "").replace(/[R$A£€\s,]/gi, "");
   if (!/^\d{1,8}(\.\d{1,2})?$/.test(cleaned)) return null;
   const minor = Math.round(Number(cleaned) * 100);
   return minor <= MAX_MINOR ? minor : null;
@@ -43,7 +44,7 @@ const serviceSchema = z
     name: z.string().trim().min(3, "Enter the service name.").max(160),
     category: z.string().trim().min(1, "Choose a category.").max(80),
     jurisdiction: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "Choose a country.").default("ZA"),
-    currency: z.enum(["ZAR", "AUD", "USD", "GBP", "EUR"]).default("ZAR"),
+    currency: z.enum(CURRENCIES).default("ZAR"),
     lines: z.array(lineSchema).min(1, "Add at least one fee line.").max(12),
     deposit: money("the deposit"),
     isActive: z.union([z.boolean(), z.literal("on"), z.literal("true"), z.literal("false"), z.literal("")]).optional().transform((v) => v === true || v === "on" || v === "true"),

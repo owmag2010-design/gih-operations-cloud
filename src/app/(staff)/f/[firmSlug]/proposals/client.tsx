@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { ActionFeedback, fieldError, SubmitButton } from "@/components/ui/forms";
 import { Button, Field, Input, Notice, Select, Textarea } from "@/components/ui/primitives";
+import { CURRENCIES } from "@/lib/countries";
 import {
   addProposalItemAction,
   createProposalAction,
@@ -74,7 +75,7 @@ export function DetailsEditor({ firmSlug, id, initial, editable }: { firmSlug: s
         <Field label="Prepared for" name="recipientName"><Input value={d.recipientName} onChange={(e) => set({ recipientName: e.target.value })} maxLength={160} /></Field>
         <Field label="Client email" name="recipientEmail"><Input type="email" value={d.recipientEmail} onChange={(e) => set({ recipientEmail: e.target.value })} /></Field>
         <Field label="Valid for (days)" name="validDays"><Input type="number" min={1} max={90} value={d.validDays} onChange={(e) => set({ validDays: Number(e.target.value) })} /></Field>
-        <Field label="Currency" name="currency"><Select value={d.currency} onChange={(e) => set({ currency: e.target.value })}>{["ZAR", "AUD", "USD", "GBP", "EUR"].map((c) => <option key={c}>{c}</option>)}</Select></Field>
+        <Field label="Currency" name="currency"><Select value={d.currency} onChange={(e) => set({ currency: e.target.value })}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select></Field>
       </div>
       <div className="flex flex-col gap-3">
         <p className="text-[13px] font-medium text-ink">Sections</p>

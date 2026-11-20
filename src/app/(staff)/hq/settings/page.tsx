@@ -12,6 +12,7 @@ export default async function HubSettingsPage() {
     ctx.has("firms:view") && { href: "/hq/firms", title: "Practices", text: "Partner practices, their branding, reference prefixes and policies." },
     ctx.has("staff:view") && { href: "/hq/people", title: "People and roles", text: "Staff, invitations, Hub roles and practice memberships." },
     (ctx.has("routing:manage") || ctx.has("intake:view")) && { href: "/hq/routing", title: "Enquiry routing", text: "Which practice gets which Hub enquiry." },
+    { href: "/hq/countries", title: "Countries", text: "Country profiles, holiday calendars, sources, review status and what each practice has checked in each country." },
     { href: "/settings/email", title: "Email", text: "Connected mailboxes, shared inboxes and the server's email connections." },
     { href: "/settings/signatures", title: "Signatures", text: "Your signature and each practice's default." },
     ctx.has("audit:view") && { href: "/hq/audit", title: "Audit log", text: "Who did what, across the organisation." },

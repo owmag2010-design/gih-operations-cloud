@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { ActionFeedback, fieldError, SubmitButton } from "@/components/ui/forms";
-import { Checkbox, Field, Input, Select } from "@/components/ui/primitives";
+import { Checkbox, Field, Input, Notice, Select } from "@/components/ui/primitives";
 import { CountrySelect } from "@/components/country-select";
 import { createMatterAction } from "../actions";
 
@@ -11,6 +11,8 @@ type Options = {
   services: { id: string; name: string; code: string }[];
   team: { id: string; name: string }[];
   proposals: { id: string; ref: string; title: string; clientId: string | null }[];
+  offices: { id: string; name: string; country: string }[];
+  countries: { code: string; status: string }[];
 };
 
 export function MatterForm({ slug, options, meId, defaults }: { slug: string; options: Options; meId: string; defaults: { clientId?: string; proposalId?: string } }) {
@@ -19,6 +21,8 @@ export function MatterForm({ slug, options, meId, defaults }: { slug: string; op
   const [clientId, setClientId] = useState(initialProposal?.clientId ?? defaults.clientId ?? "");
   const [title, setTitle] = useState(initialProposal?.title ?? "");
   const proposals = options.proposals.filter((p) => p.clientId === clientId);
+  const [destination, setDestination] = useState("");
+  const destinationStatus = options.countries.find((c) => c.code === destination)?.status;
   return (
     <form action={action} className="flex flex-col gap-5">
       <ActionFeedback state={state} />
@@ -49,10 +53,21 @@ export function MatterForm({ slug, options, meId, defaults }: { slug: string; op
         <Field label="Legal category" name="legalCategory" idPrefix="m" hint="Defaults to the service's category." error={fieldError(state, "legalCategory")}>
           <Input maxLength={120} placeholder="e.g. Temporary residence" />
         </Field>
-        <Field label="Jurisdiction" name="jurisdiction" idPrefix="m" error={fieldError(state, "jurisdiction")}>
-          <CountrySelect defaultValue="" placeholder="Service default" />
+        <Field label="Destination country" name="jurisdiction" idPrefix="m" hint="Where the application is made. Defaults to the service's country." error={fieldError(state, "jurisdiction")}>
+          <CountrySelect value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Service default" />
         </Field>
       </div>
+      {destination && destinationStatus !== "operational" ? (
+        <Notice tone="warn">
+          {destinationStatus ? `The country profile for ${destination} is ${destinationStatus.replace("_", " ")}.` : `${destination} has no country profile yet.`} You can open and work the matter, but proposals for this country can&apos;t be sent to the client until a Hub reviewer makes it operational.
+        </Notice>
+      ) : null}
+      <Field label="Handled from" name="operatingOfficeId" idPrefix="m" hint="The office (and so the country) the practice runs this matter from. Separate from the client's nationality and residence." error={fieldError(state, "operatingOfficeId")}>
+        <Select defaultValue={options.offices.length === 1 ? options.offices[0].id : ""}>
+          <option value="">Not recorded</option>
+          {options.offices.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.country})</option>)}
+        </Select>
+      </Field>
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Case manager" name="caseManagerId" idPrefix="m" error={fieldError(state, "caseManagerId")}>
           <Select defaultValue={meId}>

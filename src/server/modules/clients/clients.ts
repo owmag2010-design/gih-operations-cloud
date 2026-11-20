@@ -1,4 +1,5 @@
 import "server-only";
+import { isCountryCode } from "@/lib/countries";
 import { and, asc, count, desc, eq, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { AccessContext } from "../../access/context";
@@ -17,6 +18,13 @@ const clientSchema = z
     phone: optionalText(40),
     nationality: optionalCountry,
     countryOfResidence: optionalCountry,
+    /** Further nationalities, as country codes separated by commas or a list. */
+    otherNationalities: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .transform((v) => [...new Set((Array.isArray(v) ? v : (v ?? "").split(/[,\s]+/)).map((c) => c.trim().toUpperCase()).filter(Boolean))])
+      .refine((v) => v.every(isCountryCode), "Use country codes from the list, for example ZW, GB.")
+      .refine((v) => v.length <= 5, "List at most five further nationalities."),
     status: z.enum(["active", "inactive", "archived"]).default("active"),
     primaryConsultantId: optionalUuid,
   })
@@ -110,7 +118,7 @@ export async function createClient(ctx: AccessContext, firmId: string, raw: unkn
       .values({
         firmId, ref: await nextRef(tx, firmId, ctx.firm(firmId).refPrefix, "client"),
         firstName: input.firstName, lastName: input.lastName, email: input.email, phone: normalisePhone(input.phone, input.countryOfResidence),
-        nationality: input.nationality, countryOfResidence: input.countryOfResidence, status: input.status,
+        nationality: input.nationality, countryOfResidence: input.countryOfResidence, otherNationalities: input.otherNationalities.filter((c) => c !== input.nationality), status: input.status,
         primaryConsultantId: input.primaryConsultantId ?? ctx.user.id, createdById: ctx.user.id,
       })
       .returning();
@@ -130,7 +138,7 @@ export async function updateClient(ctx: AccessContext, firmId: string, id: strin
       .update(clients)
       .set({
         firstName: input.firstName, lastName: input.lastName ?? null, email: input.email ?? null, phone: normalisePhone(input.phone, input.countryOfResidence) ?? null,
-        nationality: input.nationality ?? null, countryOfResidence: input.countryOfResidence ?? null, status: input.status,
+        nationality: input.nationality ?? null, countryOfResidence: input.countryOfResidence ?? null, otherNationalities: input.otherNationalities.filter((c) => c !== input.nationality), status: input.status,
         primaryConsultantId: input.primaryConsultantId ?? before.primaryConsultantId, updatedAt: new Date(),
       })
       .where(eq(clients.id, before.id))
