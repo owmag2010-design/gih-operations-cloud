@@ -24,6 +24,8 @@ function highlights(d: MyDay): string[] {
   const overdue = d.tasks.filter((t) => t.overdue).length;
   if (overdue) parts.push(plural(overdue, "overdue task"));
   if (d.deadlines?.length) parts.push(plural(d.deadlines.length, "matter date") + " in the next two weeks");
+  const toReview = d.documents?.filter((x) => x.kind === "review").length ?? 0;
+  if (toReview) parts.push(plural(toReview, "client document") + " to review");
   if (d.reviews?.length) parts.push(plural(d.reviews.length, "proposal") + " to approve");
   if (d.changes?.length) parts.push(plural(d.changes.length, "proposal") + " sent back to you");
   if (d.followUps?.length) parts.push(plural(d.followUps.length, "follow-up") + " due by tomorrow");
@@ -43,6 +45,8 @@ function needs(d: MyDay): Need[] {
   const out: Need[] = [];
   for (const t of d.tasks.filter((x) => x.overdue || x.reminded))
     out.push({ key: `task-${t.id}`, href: t.matterId && t.firm ? `/f/${t.firm.slug}/matters/${t.matterId}#tasks` : "/tasks", eyebrow: `${t.firm?.name ?? "Personal"} · ${t.overdue ? "overdue task" : "reminder"}`, title: t.title, detail: t.matterRef ? `Matter ${t.matterRef}` : null, slug: t.firm?.slug ?? null, color: t.firm?.brandColor ?? null, time: t.dueAt });
+  for (const x of (d.documents ?? []).filter((y) => y.kind !== "expiring"))
+    out.push({ key: `doc-${x.id}`, href: `/f/${x.firm.slug}/matters/${x.matterId}#requests`, eyebrow: `${x.firm.name} · ${x.kind === "review" ? "document to review" : "document overdue from the client"}`, title: x.label, detail: `Matter ${x.matterRef}${x.date ? `, due ${x.date}` : ""}`, slug: x.firm.slug, color: x.firm.brandColor });
   for (const p of d.reviews ?? [])
     out.push({ key: `r-${p.id}`, href: `/f/${p.firm.slug}/proposals/${p.id}`, eyebrow: `${p.firm.name} · waiting for approval`, title: p.title, detail: `${p.ref} for ${p.recipient}. Approve to release the client link.`, slug: p.firm.slug, color: p.firm.brandColor });
   for (const p of d.changes ?? [])
@@ -65,6 +69,7 @@ export default async function TodayPage() {
   const upcoming: Up[] = [
     ...(d.deadlines ?? []).map((x) => ({ key: `d-${x.id}`, when: x.dueOn, title: `${x.label}`, sub: `${x.firm.name} · ${x.matterRef}`, href: `/f/${x.firm.slug}/matters/${x.matterId}`, overdue: x.dueOn < todayIso })),
     ...d.tasks.filter((t) => t.dueAt && !t.overdue).map((t) => ({ key: `t-${t.id}`, when: t.dueAt!, title: t.title, sub: t.firm?.name ?? "Personal task", href: t.matterId && t.firm ? `/f/${t.firm.slug}/matters/${t.matterId}#tasks` : "/tasks", overdue: false })),
+    ...(d.documents ?? []).filter((x) => x.kind === "expiring" && x.date).map((x) => ({ key: `e-${x.id}`, when: x.date!, title: `${x.label} expires`, sub: `${x.firm.name} · ${x.matterRef}`, href: `/f/${x.firm.slug}/matters/${x.matterId}#requests`, overdue: x.date! < todayIso })),
     ...(d.followUps ?? []).map((l) => ({ key: `f-${l.id}`, when: l.followUpAt, title: `Follow up ${l.name}`, sub: l.firm.name, href: `/f/${l.firm.slug}/leads/${l.id}`, overdue: l.overdue })),
   ].sort((a, b) => (typeof a.when === "string" ? a.when : a.when.toISOString()).localeCompare(typeof b.when === "string" ? b.when : b.when.toISOString()));
 

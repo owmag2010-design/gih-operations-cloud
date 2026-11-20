@@ -8,6 +8,10 @@ import {
   moveMatterStage, removeFact, removeMatterMember, removePerson, saveDeadlineRule, savePerson, updateMatter, updateMatterStage, validateDeadlineRule, verifyFact,
 } from "@/server/modules/matters/matters";
 import { saveTaskTemplate, setTaskTemplateActive } from "@/server/modules/tasks/tasks";
+import {
+  addChecklistItem, addDocumentRequest, applyChecklist, createChecklistTemplate, newChecklistVersion, publishChecklistTemplate, removeChecklistItem,
+  retireChecklistTemplate, stepDocumentRequest, updateChecklistDraft,
+} from "@/server/modules/checklists/checklists";
 import { requireFirm } from "@/server/next/session";
 
 const data = (f: FormData) => Object.fromEntries([...f.keys()].map((k) => [k, f.getAll(k).length > 1 ? f.getAll(k).map(String) : String(f.get(k))]));
@@ -108,4 +112,62 @@ export async function saveDeadlineRuleAction(slug: string, ruleId: string | null
 }
 export async function validateDeadlineRuleAction(slug: string, ruleId: string, valid: boolean) {
   return run(slug, (f, ctx) => validateDeadlineRule(ctx, f, ruleId, valid), valid ? "Rule validated." : "Rule withdrawn.", `/f/${slug}/settings`);
+}
+
+/* ───────── Document checklists and requests ───────── */
+
+export async function createChecklistAction(slug: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  let id: string;
+  try {
+    id = (await createChecklistTemplate(ctx, firm.firmId, data(form))).id;
+  } catch (err) {
+    return toActionError(err);
+  }
+  revalidatePath(`/f/${slug}/settings`, "layout");
+  redirect(`/f/${slug}/settings/checklists/${id}`);
+}
+export async function updateChecklistAction(slug: string, id: string, _: ActionResult | null, form: FormData) {
+  return run(slug, (f, ctx) => updateChecklistDraft(ctx, f, id, data(form)), "Checklist saved.", `/f/${slug}/settings`);
+}
+export async function addChecklistItemAction(slug: string, id: string, _: ActionResult | null, form: FormData) {
+  return run(slug, (f, ctx) => addChecklistItem(ctx, f, id, data(form)), "Document added.", `/f/${slug}/settings`);
+}
+export async function removeChecklistItemAction(slug: string, id: string, itemId: string) {
+  return run(slug, (f, ctx) => removeChecklistItem(ctx, f, id, itemId), "Document removed.", `/f/${slug}/settings`);
+}
+export async function publishChecklistAction(slug: string, id: string) {
+  return run(slug, (f, ctx) => publishChecklistTemplate(ctx, f, id), "Published. New matters get this version; existing matters keep theirs.", `/f/${slug}/settings`);
+}
+export async function retireChecklistAction(slug: string, id: string) {
+  return run(slug, (f, ctx) => retireChecklistTemplate(ctx, f, id), "Retired. It can no longer be applied to matters.", `/f/${slug}/settings`);
+}
+export async function newChecklistVersionAction(slug: string, id: string): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  let next: string;
+  try {
+    next = (await newChecklistVersion(ctx, firm.firmId, id)).id;
+  } catch (err) {
+    return toActionError(err);
+  }
+  revalidatePath(`/f/${slug}/settings`, "layout");
+  redirect(`/f/${slug}/settings/checklists/${next}`);
+}
+export async function applyChecklistAction(slug: string, matterId: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    const r = await applyChecklist(ctx, firm.firmId, matterId, data(form));
+    revalidatePath(`/f/${slug}/matters`, "layout");
+    return { ok: true, message: `${r.created} document${r.created === 1 ? "" : "s"} requested.${r.skipped.length ? ` Not applied: ${r.skipped.join("; ")}.` : ""}` };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+export async function addDocumentRequestAction(slug: string, matterId: string, _: ActionResult | null, form: FormData) {
+  return run(slug, (f, ctx) => addDocumentRequest(ctx, f, matterId, data(form)), "Document requested.");
+}
+export async function stepDocumentRequestAction(slug: string, matterId: string, requestId: string, _: ActionResult | null, form: FormData) {
+  const step = String(form.get("kind"));
+  const msg: Record<string, string> = { receive: "Marked received.", review: "Under review.", accept: "Accepted.", reject: "Replacement requested.", waive: "Waived." };
+  return run(slug, (f, ctx) => stepDocumentRequest(ctx, f, matterId, requestId, data(form)), msg[step] ?? "Saved.");
 }

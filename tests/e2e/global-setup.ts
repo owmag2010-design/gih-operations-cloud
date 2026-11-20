@@ -42,6 +42,11 @@ export default async function setup() {
   const [hubRole] = await db.select().from(s.roles).where(eq(s.roles.key, "group_super_admin"));
   const [hubUser] = await db.insert(s.users).values({ orgId: org.id, email: "hub.e2e@example.test", name: "Hana Hub", passwordHash, status: "active", kind: "staff", mfaSecretEnc: encryptForApp(totpSecret), mfaEnabledAt: new Date() }).returning();
   await db.insert(s.groupMemberships).values({ userId: hubUser.id, roleId: hubRole.id });
+  // A Veritas practice administrator (also needs two-step sign-in), sharing the same authenticator secret.
+  const [firmAdminRole] = await db.select().from(s.roles).where(eq(s.roles.key, "firm_admin"));
+  const [veritasFirm] = await db.select().from(s.firms).where(eq(s.firms.slug, "veritas"));
+  const [ada] = await db.insert(s.users).values({ orgId: org.id, email: "veritas.admin.e2e@example.test", name: "Ada Admin", passwordHash, status: "active", kind: "staff", mfaSecretEnc: encryptForApp(totpSecret), mfaEnabledAt: new Date() }).returning();
+  await db.insert(s.firmMemberships).values({ firmId: veritasFirm.id, userId: ada.id, roleId: firmAdminRole.id });
   // Two engine conversations, labelled as tests: one from the Veritas website, one with a Mimshac proposal.
   await pool.query("truncate engine.messages, engine.proposals, engine.chats, engine.leads");
   const v = (await pool.query(`insert into engine.leads (name, email, phone, first_channel, status, facts, is_test, last_message_at) values ('E2E Thandi Test', 'thandi.e2e@example.test', '27820000001', 'whatsapp', 'waiting_details', '{"site_source":"veritas-site"}', true, now()) returning id`)).rows[0].id;
