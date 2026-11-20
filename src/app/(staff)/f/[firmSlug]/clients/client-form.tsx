@@ -7,7 +7,7 @@ import { ActionFeedback, fieldError, SubmitButton } from "@/components/ui/forms"
 import { Button, Field, Input, Panel, PanelHeader, Select } from "@/components/ui/primitives";
 import type { ActionResult } from "@/server/errors";
 
-type Values = { firstName?: string; lastName?: string | null; email?: string | null; phone?: string | null; nationality?: string | null; countryOfResidence?: string | null; status?: string; primaryConsultantId?: string | null };
+type Values = { firstName?: string; lastName?: string | null; email?: string | null; phone?: string | null; nationality?: string | null; otherNationalities?: string[]; countryOfResidence?: string | null; status?: string; primaryConsultantId?: string | null };
 
 export function ClientForm({ action, initial = {}, people, mode, cancelHref }: { action: (p: ActionResult | null, f: FormData) => Promise<ActionResult>; initial?: Values; people: { id: string; name: string }[]; mode: "create" | "edit"; cancelHref: string }) {
   const [state, formAction] = useActionState(action, null);
@@ -23,6 +23,7 @@ export function ClientForm({ action, initial = {}, people, mode, cancelHref }: {
           <Field label="Email" name="email" error={err("email")}><Input type="email" defaultValue={initial.email ?? ""} /></Field>
           <Field label="Phone" name="phone" error={err("phone")}><Input type="tel" defaultValue={initial.phone ?? ""} /></Field>
           <Field label="Nationality" name="nationality" error={err("nationality")}><CountrySelect defaultValue={initial.nationality ?? ""} /></Field>
+          <Field label="Other nationalities" name="otherNationalities" hint="Country codes separated by commas, e.g. GB, ZW." error={err("otherNationalities")}><Input defaultValue={(initial.otherNationalities ?? []).join(", ")} maxLength={40} /></Field>
           <Field label="Country of residence" name="countryOfResidence" error={err("countryOfResidence")}><CountrySelect defaultValue={initial.countryOfResidence ?? ""} /></Field>
           <Field label="Primary consultant" name="primaryConsultantId" hint={mode === "create" ? "Defaults to you." : undefined} error={err("primaryConsultantId")}>
             <Select defaultValue={initial.primaryConsultantId ?? ""}>

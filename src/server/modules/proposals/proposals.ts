@@ -1,4 +1,6 @@
 import "server-only";
+import { CURRENCIES } from "@/lib/countries";
+import { assertOperational } from "../countries/countries";
 import { and, asc, count, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AccessContext } from "../../access/context";
@@ -263,7 +265,7 @@ const detailsSchema = z.object({
   recipientName: z.string().trim().min(2, "Enter the client's name.").max(160),
   recipientEmail: optionalEmail,
   validDays: z.coerce.number().int().min(1, "Between 1 and 90 days.").max(90, "Between 1 and 90 days.").default(14),
-  currency: z.enum(["ZAR", "AUD", "USD", "GBP", "EUR"]).default("ZAR"),
+  currency: z.enum(CURRENCIES).default("ZAR"),
   sections: z.array(sectionSchema).max(20),
 });
 
@@ -410,6 +412,14 @@ export async function releaseProposal(ctx: AccessContext, firmId: string, id: st
   return withScope(ctx.scopeFor(firmId), async (tx) => {
     const p = await load(tx, ctx, firmId, id, true);
     assertStatus(p, ["approved"], "sent");
+    // Client-facing: every destination country in the proposal must be operational.
+    const countries = await tx
+      .select({ c: services.jurisdiction })
+      .from(proposalItems)
+      .innerJoin(services, eq(services.id, proposalItems.serviceId))
+      .where(eq(proposalItems.proposalId, p.id));
+    const [lead] = await tx.select({ c: leads.destinationCountry }).from(leads).where(eq(leads.id, p.leadId));
+    await assertOperational(tx, ctx.orgId, [...countries.map((r) => r.c), lead?.c], `Proposal ${p.ref}`);
     const now = new Date();
     const [already] = await tx.select({ v: proposalVersions.version }).from(proposalVersions).where(and(eq(proposalVersions.proposalId, p.id), eq(proposalVersions.version, p.version)));
     if (already) throw new ConflictError("This version was already sent. Start a new version first.");

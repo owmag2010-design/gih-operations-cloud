@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LocalTime } from "@/components/ui/forms";
 import { Badge, EmptyState, PageHeader, Panel, PanelHeader } from "@/components/ui/primitives";
+import { listCalendarsFor, listCountries } from "@/server/modules/countries/countries";
 import { listDeadlineRules, listStageSets } from "@/server/modules/matters/matters";
 import { listTaskTemplates } from "@/server/modules/tasks/tasks";
 import { requireFirm } from "@/server/next/session";
@@ -15,7 +16,9 @@ export default async function MatterSettingsPage({ params }: PageProps<"/f/[firm
   const { firmSlug } = await params;
   const { ctx, firm } = await requireFirm(firmSlug);
   const canManage = ctx.has("firm:manage", firm.firmId);
-  const [{ stages, services }, templates, rules] = await Promise.all([listStageSets(ctx, firm.firmId), listTaskTemplates(ctx, firm.firmId), listDeadlineRules(ctx, firm.firmId)]);
+  const [{ stages, services }, templates, rules, countries, calendars] = await Promise.all([
+    listStageSets(ctx, firm.firmId), listTaskTemplates(ctx, firm.firmId), listDeadlineRules(ctx, firm.firmId), listCountries(ctx), listCalendarsFor(ctx),
+  ]);
   const defaults = stages.filter((s) => !s.serviceId);
   const byService = services.map((svc) => ({ svc, stages: stages.filter((s) => s.serviceId === svc.id) })).filter((x) => x.stages.length);
 
@@ -78,7 +81,7 @@ export default async function MatterSettingsPage({ params }: PageProps<"/f/[firm
                 <li key={r.id} className="flex flex-wrap items-start gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-ink">{r.name} <span className="ml-1 text-xs font-normal text-muted">{r.jurisdiction}</span></p>
-                    <p className="text-xs text-ink-2">{r.offsetDays} {r.businessDays ? "business" : "calendar"} days from {r.fromLabel}</p>
+                    <p className="text-xs text-ink-2">{r.offsetDays} {r.businessDays ? "business" : "calendar"} days from {r.fromLabel}{r.businessDays ? (() => { const cal = calendars.find((c) => c.id === r.calendarId); return cal ? <>, skipping {cal.name}{cal.status !== "verified" ? <span className="text-warn"> (calendar not verified: can&apos;t calculate)</span> : null}</> : ", skipping weekends only"; })() : null}</p>
                     <p className="text-xs text-muted">Source: {r.source}</p>
                     <p className="mt-0.5 text-xs">{r.validatedAt ? <span className="text-ok">Validated by {r.validatedBy ?? "unknown"} · <LocalTime value={r.validatedAt} mode="date" /></span> : <span className="text-warn">{r.isActive ? "Not validated: can't be used yet" : "Withdrawn"}</span>}</p>
                   </div>
@@ -87,7 +90,7 @@ export default async function MatterSettingsPage({ params }: PageProps<"/f/[firm
               ))}
             </ul>
           ) : <EmptyState title="No deadline rules">No rules are pre-loaded: add only rules your practice has checked, with their source. Until then, record deadlines as dates taken from the relevant letter.</EmptyState>}
-          {canManage ? <DeadlineRuleForm slug={firm.slug} /> : null}
+          {canManage ? <DeadlineRuleForm slug={firm.slug} countries={countries.filter((c) => c.status !== "retired").map((c) => ({ code: c.code, name: c.name }))} calendars={calendars} /> : null}
         </Panel>
       </div>
     </>

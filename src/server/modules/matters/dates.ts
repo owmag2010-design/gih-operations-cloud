@@ -21,17 +21,18 @@ export function addCalendarDays(from: string, days: number): string {
 }
 
 /**
- * Add business days (Monday to Friday). Public holidays are not excluded;
- * the basis text says so and a reviewer can adjust the result.
+ * Add business days (Monday to Friday), skipping any dates in `holidays`
+ * (YYYY-MM-DD). Without a verified holiday calendar only weekends are skipped;
+ * the deadline's basis text says which applied.
  */
-export function addBusinessDays(from: string, days: number): string {
+export function addBusinessDays(from: string, days: number, holidays: ReadonlySet<string> = new Set()): string {
   const d = parse(from);
   const step = days >= 0 ? 1 : -1;
   let left = Math.abs(days);
   while (left > 0) {
     d.setUTCDate(d.getUTCDate() + step);
     const wd = d.getUTCDay();
-    if (wd !== 0 && wd !== 6) left--;
+    if (wd !== 0 && wd !== 6 && !holidays.has(d.toISOString().slice(0, 10))) left--;
   }
   return d.toISOString().slice(0, 10);
 }

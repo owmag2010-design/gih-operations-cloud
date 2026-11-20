@@ -78,11 +78,11 @@ export function StageBar({ slug, matterId, stages, currentId, canEdit }: { slug:
 /* ───────── Edit matter ───────── */
 
 type MatterLike = {
-  id: string; title: string; legalCategory: string | null; jurisdiction: string | null; caseManagerId: string | null; consultantId: string | null; restricted: boolean;
+  id: string; title: string; legalCategory: string | null; jurisdiction: string | null; operatingOfficeId: string | null; caseManagerId: string | null; consultantId: string | null; restricted: boolean;
   risk: "low" | "medium" | "high"; riskNote: string | null; submissionReference: string | null; submissionChannel: string | null; submittedOn: string | null; outcome: string | null;
 };
 
-export function EditMatterDialog({ slug, matter, team, canRestrict }: { slug: string; matter: MatterLike; team: { id: string; name: string }[]; canRestrict: boolean }) {
+export function EditMatterDialog({ slug, matter, team, canRestrict, offices }: { slug: string; matter: MatterLike; team: { id: string; name: string }[]; canRestrict: boolean; offices: { id: string; name: string; country: string }[] }) {
   const [open, setOpen] = useState(false);
   const [state, action] = useActionState(updateMatterAction.bind(null, slug, matter.id), null);
   useCloseOnOk(state, () => setOpen(false));
@@ -95,7 +95,10 @@ export function EditMatterDialog({ slug, matter, team, canRestrict }: { slug: st
           <Field label="Title" name="title" idPrefix="em" error={fieldError(state, "title")}><Input defaultValue={matter.title} required maxLength={160} /></Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Legal category" name="legalCategory" idPrefix="em"><Input defaultValue={matter.legalCategory ?? ""} maxLength={120} /></Field>
-            <Field label="Jurisdiction" name="jurisdiction" idPrefix="em" error={fieldError(state, "jurisdiction")}><CountrySelect defaultValue={matter.jurisdiction ?? ""} /></Field>
+            <Field label="Destination country" name="jurisdiction" idPrefix="em" error={fieldError(state, "jurisdiction")}><CountrySelect defaultValue={matter.jurisdiction ?? ""} /></Field>
+            <Field label="Handled from" name="operatingOfficeId" idPrefix="em" error={fieldError(state, "operatingOfficeId")}>
+              <Select defaultValue={matter.operatingOfficeId ?? ""}><option value="">Not recorded</option>{offices.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.country})</option>)}</Select>
+            </Field>
             <Field label="Case manager" name="caseManagerId" idPrefix="em" error={fieldError(state, "caseManagerId")}>
               <Select defaultValue={matter.caseManagerId ?? ""}><option value="">None</option>{team.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select>
             </Field>

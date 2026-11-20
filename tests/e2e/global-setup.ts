@@ -3,7 +3,9 @@ import { hash } from "@node-rs/argon2";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { eq } from "drizzle-orm";
+import { createCipheriv, randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import { generateSecret } from "otplib";
 import { Pool } from "pg";
 import { runSeed } from "../../scripts/seed-lib";
 import * as s from "../../src/server/db/schema";
@@ -35,6 +37,11 @@ export default async function setup() {
   const [reviewerRole] = await db.select().from(s.roles).where(eq(s.roles.key, "reviewer"));
   const [rv] = await db.insert(s.users).values({ orgId: org.id, email: "reviewer.e2e@example.test", name: "Rita Reviewer", passwordHash, status: "active", kind: "staff" }).returning();
   await db.insert(s.firmMemberships).values({ firmId: veritas.id, userId: rv.id, roleId: reviewerRole.id });
+  // A Hub administrator with two-step sign-in already enrolled (group roles require it).
+  const totpSecret = generateSecret();
+  const [hubRole] = await db.select().from(s.roles).where(eq(s.roles.key, "group_super_admin"));
+  const [hubUser] = await db.insert(s.users).values({ orgId: org.id, email: "hub.e2e@example.test", name: "Hana Hub", passwordHash, status: "active", kind: "staff", mfaSecretEnc: encryptForApp(totpSecret), mfaEnabledAt: new Date() }).returning();
+  await db.insert(s.groupMemberships).values({ userId: hubUser.id, roleId: hubRole.id });
   // Two engine conversations, labelled as tests: one from the Veritas website, one with a Mimshac proposal.
   await pool.query("truncate engine.messages, engine.proposals, engine.chats, engine.leads");
   const v = (await pool.query(`insert into engine.leads (name, email, phone, first_channel, status, facts, is_test, last_message_at) values ('E2E Thandi Test', 'thandi.e2e@example.test', '27820000001', 'whatsapp', 'waiting_details', '{"site_source":"veritas-site"}', true, now()) returning id`)).rows[0].id;
@@ -42,5 +49,15 @@ export default async function setup() {
   await pool.query(`insert into engine.proposals (slug, lead_id, status, record) values ('e2e-overstay', $1, 'sent', '{"ref":"GIH-E2E-1","matter":"Overstay appeal","firm":{"name":"Mimshac Group"},"fees":[{"amount":10000}]}')`, [m]);
   await pool.query(`insert into engine.messages (lead_id, channel, direction, body, created_at) values ($1, 'whatsapp', 'in', 'I need a spouse visa', now() - interval '5 minutes'), ($1, 'whatsapp', 'out', 'May I have your full name?', now() - interval '4 minutes'), ($2, 'email', 'in', 'Overstay ban question', now())`, [v, m]);
   await pool.end();
-  writeFileSync("tests/e2e/.state.json", JSON.stringify({ password: PASSWORD }));
+  writeFileSync("tests/e2e/.state.json", JSON.stringify({ password: PASSWORD, totpSecret }));
+}
+
+/** Same format as src/server/auth/crypto.ts encrypt(), with the e2e server's key. */
+function encryptForApp(plain: string) {
+  const raw = process.env.E2E__DATA_ENCRYPTION_KEY!;
+  const key = /^[0-9a-fA-F]{64}$/.test(raw) ? Buffer.from(raw, "hex") : Buffer.from(raw.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const ct = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+  return ["v1", iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), ct.toString("base64url")].join(".");
 }
