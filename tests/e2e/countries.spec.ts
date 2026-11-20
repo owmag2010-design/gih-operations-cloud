@@ -1,27 +1,11 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { generate } from "otplib";
+import { signInWithCode } from "./mfa";
 
 const PASSWORD = "e2e passphrase for testing";
 const SHOTS = process.env.E2E_SCREENSHOTS;
-const state = () => JSON.parse(readFileSync("tests/e2e/.state.json", "utf8")) as { totpSecret: string };
 
-const STEP_FILE = "tests/e2e/.totp-step";
-
-async function signInHub(page: Page) {
-  // Each 30-second code is accepted once (also across worker restarts), so wait for a fresh window if this one was used.
-  const last = existsSync(STEP_FILE) ? Number(readFileSync(STEP_FILE, "utf8")) : 0;
-  while (Math.floor(Date.now() / 30_000) <= last) await page.waitForTimeout(1000);
-  writeFileSync(STEP_FILE, String(Math.floor(Date.now() / 30_000)));
-  await page.goto("/login");
-  await page.getByLabel("Email").fill("hub.e2e@example.test");
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.getByLabel("Code").fill(await generate({ secret: state().totpSecret }));
-  await page.getByRole("button", { name: /Verify|Continue|Sign in/ }).click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
-}
+const signInHub = (page: Page) => signInWithCode(page, "hub.e2e@example.test");
 
 async function serious(page: Page) {
   const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();

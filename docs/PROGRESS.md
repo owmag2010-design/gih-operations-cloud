@@ -1,5 +1,16 @@
 # Progress Log
 
+## 21 Nov 2026: Document checklists and requests (branch `country-checklists`, stacked on `countries-jurisdictions`)
+**Done (tested):**
+- **Checklist templates** per practice, destination country and (optionally) service (`src/server/modules/checklists`, docs/21-checklists.md): documents with who they're for (main applicant, each applicant, partner, dependants, sponsor or once per matter), required or optional, expiry tracked, shown to the client or staff only. Versioned: publishing locks a version (also in the database) and retires the previous one; a new version starts as a copy. Publishing needs the country verified by the Hub and a recorded source.
+- **Document requests on matters**: apply a published checklist (only one for the matter's destination country; never another country's), or request one document at a time. Requested → received (a file uploaded to this matter) → under review → accepted (by someone with documents:approve, with the expiry date when tracked) or replacement requested (with a reason); waive with a reason. Every change kept (append-only); requests are never deleted; the database enforces the evidence for each status.
+- **Stage gate**: a stage can be marked "needs documents"; a matter can't move into it while required requests are outstanding, and the message lists them.
+- **My day**: client documents overdue, waiting for my review, and accepted documents expiring within 90 days, on matters I'm on.
+- Migrations 0029–0030 (firm isolation, restricted-matter policies, same-firm keys, locked published versions).
+- Tests: 137 unit/integration (5 new) and 20 end-to-end (1 new, with axe), all passing.
+
+**Next:** client portal (clients upload against their requests and see client-visible status), then reminders and automation.
+
 ## 21 Nov 2026: Countries and jurisdictions (AU, NZ, ZA native)
 **Done (tested), branch `countries-jurisdictions`:**
 - **Country profiles** (`src/server/modules/countries`, docs/19-countries.md): currency, date format, phone prefix, time zones, address format and authorities per country, with version history and review (draft → in review → verified → operational → retired). Editing a verified or operational profile returns it to draft. Hub › Settings › Countries; new countries need no code. Starting drafts for AU, NZ, ZA and ZW from `data/config/countries.json`.

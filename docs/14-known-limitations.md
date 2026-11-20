@@ -50,7 +50,7 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L40 | ~~Business-day deadlines skip weekends only~~ | Resolved 21 Nov 2026: a rule can name a verified holiday calendar (Settings › Countries); without one only weekends are skipped and the basis says so | — |
 | L41 | No deadline rules are pre-loaded | Calculated deadlines need a practice administrator to add and validate each rule with its source | By design: rules must come from the practice, not from the software |
 | L42 | Client-visible notes are only classified | There is no client portal yet to show them in | Client portal (Milestone 4) |
-| L43 | Matter checklists aren't built (documents, files and invoices now are) | No per-matter document checklist yet | Checklists by service |
+| L43 | ~~Matter checklists aren't built~~ | Resolved 21 Nov 2026: versioned checklists per country and service, and document requests on matters (docs/21-checklists.md) | — |
 | L44 | The Airtable mirror is read-only | Changes must still be made in Airtable | Write-back design in docs/16-airtable-mirror.md |
 | L45 | ~~The Airtable mirror needs `AIRTABLE_TOKEN`~~ | Resolved 24 Oct 2026: token added in Vercel | — |
 | L46 | Airtable record search is a simple text match over field values | Fine for current volumes | Full-text index if tables grow large |
@@ -107,3 +107,14 @@ Updated 21 Oct 2026, end of Release 1. Nothing here is hidden behind the interfa
 | L69 | Services carry a destination country, but checklists, workflows and fee schedules are not yet versioned per country | Stages and task templates are per practice and service, not per country | Country-specific workflow templates (Stage 2) |
 | L70 | Reviewing your own submission is allowed and recorded ("self-reviewed") | No enforced four-eyes check while the Hub has one administrator | Add a policy requiring a second reviewer once there are two |
 | L71 | Registered country per practice is not yet recorded | The practice-by-country matrix can't yet show which entity is local | Owen confirms each practice's country of registration |
+
+## Added 21 Nov 2026 (document checklists and requests)
+
+| # | Limitation | Impact | Plan |
+|---|---|---|---|
+| L72 | No checklists are pre-loaded | Each practice writes its own per country and service, citing the source | By design: checklists come from the practice |
+| L73 | Clients can't upload against a request yet; staff upload the file and mark it received | Documents still arrive by email or WhatsApp | Client portal (next stage) |
+| L74 | Requests have due dates but no automatic reminders to the client | Staff chase overdue requests from My day | Reminder automation with the portal and messaging |
+| L75 | Expiry dates are recorded when a document is accepted; nothing re-requests a document when it expires | Expiring documents show in My day 90 days ahead; staff decide what to do | Automation rule "request a replacement before expiry" |
+| L76 | OCR text is not matched against the request (for example, reading a passport's expiry date) | Staff type the expiry date when accepting | Suggested fields from OCR, confirmed by staff |
+| L77 | A checklist item applies to roles on the matter (applicant, partner, dependants, sponsor); people added after the checklist was applied don't get requests automatically | Add their requests one by one, or apply the next version | Offer "add requests for new people" |
