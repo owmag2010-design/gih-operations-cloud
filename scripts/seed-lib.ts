@@ -196,6 +196,17 @@ export async function runSeed(db: NodePgDatabase<typeof s>, log: (m: string) => 
           log(`  + country profile ${p.code} (draft)`);
         }
       }
+      // 21 Nov 2026: Owen confirmed Zimbabwe bills in USD. Replace the old placeholder note once, as a new version.
+      const zw = cfg.profiles.find((p) => p.code === "ZW");
+      const [oldZw] = await tx.select().from(s.countryProfiles).where(and(eq(s.countryProfiles.orgId, org.id), eq(s.countryProfiles.code, "ZW"), sql`${s.countryProfiles.notes} like '%as a placeholder%'`));
+      if (oldZw && zw) {
+        const [upd] = await tx.update(s.countryProfiles).set({ currency: "USD", notes: zw.notes, version: oldZw.version + 1, updatedAt: new Date() }).where(eq(s.countryProfiles.id, oldZw.id)).returning();
+        const snap: Record<string, unknown> = { ...upd };
+        delete snap.createdAt;
+        delete snap.updatedAt;
+        await tx.insert(s.countryProfileVersions).values({ orgId: org.id, profileId: upd.id, version: upd.version, status: upd.status, snapshot: snap, reason: "Currency confirmed as USD (Owen, 21 Nov 2026)" });
+        log("  ~ country profile ZW: currency USD confirmed");
+      }
       for (const c of cfg.calendars) {
         const [cal] = await tx
           .insert(s.businessCalendars)

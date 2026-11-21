@@ -101,7 +101,7 @@ Every integration must record, before it can be called "connected": owner, permi
 
 ## 4. Open questions that change the product
 1. Which country is each practice (legal entity) registered in? Veritas Emigrate (Pty) Ltd, Mimshac Group and Nextmove Advisory.
-2. Which practice serves AU and NZ clients, and who holds the AU registration (OMARA) and NZ licence (IAA)? Should Bega and Canberra be added as offices?
-3. Zimbabwe: bill in USD or ZWG?
+2. Which practice serves AU and NZ clients, and who holds the AU registration (OMARA) and NZ licence (IAA)? Should Bega and Canberra be added as offices? **Answered 21 Nov 2026: AU and NZ work goes through a third party; leave OMARA/IAA for now.**
+3. Zimbabwe: bill in USD or ZWG? **Answered 21 Nov 2026: USD.**
 4. Is study-abroad and education placement (institutions, offers, COE, commissions) a real line of work now, or later?
 5. Should the KONDESK leads be migrated, or left to close out in KONDESK?
