@@ -1,5 +1,10 @@
 # Progress Log
 
+## 21 Nov 2026: Next.js security update; Zimbabwe currency confirmed (branch `next-upgrade-zw-usd`, stacked on `automation-rules`)
+- **Next.js 16.4.2 → 16.4.6** (and eslint-config-next) for the published advisory; `npm audit --omit=dev` now reports no vulnerabilities. The build no longer shows the security notice; 156 unit/integration and 22 end-to-end tests pass.
+- **Zimbabwe bills in USD** (Owen). The ZW profile's placeholder note is replaced once by the seed, recorded as a new profile version; it stays a draft until reviewed.
+- **Australia and New Zealand**: matters are handled through a third party; OMARA and IAA details are left out for now (Owen). No AU/NZ advisers or registrations are recorded.
+
 ## 21 Nov 2026: Automation rules (branch `automation-rules`, stacked on `reminders-automation`)
 **Done (tested):**
 - **Task when a client document is overdue**: one high-priority task per required document, for the case manager (or consultant), after a practice-set number of days (default 3). Never twice for the same document.
@@ -56,7 +61,7 @@
 - Migrations 0027–0028 (org-scoped row-level security, composite keys, append-only history). New permissions `countries:manage`, `countries:review` (Group Super Administrator).
 - Tests: 132 unit/integration (13 new) and 19 end-to-end (3 new, with axe), all passing.
 
-**Waiting on Owen:** review ZA and make it operational before sending proposals from this app; confirm each practice's registered country; decide ZW currency (USD or ZWG).
+**Waiting on Owen:** review ZA and make it operational before sending proposals from this app; confirm each practice's registered country (done: AU); decide ZW currency (done: USD).
 
 **Next:** country-specific workflow templates and document checklists (versioned per country and service), then the client portal.
 
