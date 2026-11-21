@@ -1,4 +1,4 @@
-# Reminders
+# Reminders and automation
 
 `src/server/modules/reminders`, the daily job at `/api/cron/reminders`, and each practice's **Settings › Reminders**.
 
@@ -18,8 +18,13 @@
 
   Restricted matters only appear for their own team. Nobody is sent an empty digest.
 
+## Automation rules
+- **Task when a document is overdue.** When a required client document is a set number of days past its due date (1 to 60, default 3) and the matter is open, the matter's case manager (or the consultant, if there's no case manager) gets one high-priority task, "Chase <document> · <reference>", due that day. Each document gets at most one task, even after the task is done.
+- **Renewal before expiry.** When an accepted document with an expiry date is due to expire within a set window (14 to 365 days, default 60), a new request for the same document and person is added to the matter. It is shown to the client if the original was, and is due two weeks before the expiry (or in a week, if that's later). Its history and the matter's activity record it as automatic. Each accepted document gets at most one renewal request, and none is added if the same document is already open again.
+- The rules run before the reminders, so a renewal request added today appears in today's digest. An open portal also picks it up in the next client reminder.
+
 ## Safeguards
-- Both are **off** until a practice administrator (`firm:manage`) switches them on. Each change is written to the audit log.
+- Everything (both reminders and both rules) is **off** until a practice administrator (`firm:manage`) switches them on. Each change is written to the audit log.
 - Every reminder is first claimed in `reminder_log` with a key for the matter or person and the day. Running the job twice on the same day sends nothing more. Log rows can't be deleted, and their only allowed change is from "claimed" to the outcome.
 - The job runs per practice with that practice's row-level security scope.
 - Without an email provider (`RESEND_API_KEY`), reminders are logged as "not set up", and the matter page shows that.

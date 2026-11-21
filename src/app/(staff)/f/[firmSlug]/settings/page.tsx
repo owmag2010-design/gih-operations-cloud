@@ -63,12 +63,14 @@ export default async function SettingsPage({ params }: PageProps<"/f/[firmSlug]/
         </Panel>
 
         <Panel id="reminders">
-          <PanelHeader title="Reminders" description="Sent once a day. Both are off until switched on here, so nothing goes to clients or staff without this practice's decision." />
+          <PanelHeader title="Reminders and automation" description="Run once a day. Everything here is off until switched on, so nothing goes to clients or staff, and nothing is created on matters, without this practice's decision." />
           <div className="flex flex-col gap-3 p-4 text-[13px]">
             <p className="text-ink-2">
               Client reminders: <strong className="text-ink">{reminders.settings.clientNudges ? `On, at most every ${reminders.settings.nudgeEveryDays} days` : "Off"}</strong>
               {" · "}Team digest: <strong className="text-ink">{reminders.settings.staffDigest ? "On" : "Off"}</strong>
-              <span className="text-muted"> · last 7 days: {sentThisWeek("client_documents")} client reminders, {sentThisWeek("staff_digest")} digests{failedThisWeek ? `, ${failedThisWeek} failed` : ""}</span>
+              {" · "}Overdue tasks: <strong className="text-ink">{reminders.settings.overdueTasks ? "On" : "Off"}</strong>
+              {" · "}Renewal requests: <strong className="text-ink">{reminders.settings.renewBeforeExpiry ? "On" : "Off"}</strong>
+              <span className="text-muted"> · last 7 days: {sentThisWeek("client_documents")} client reminders, {sentThisWeek("staff_digest")} digests, {sentThisWeek("overdue_task")} tasks, {sentThisWeek("expiry_renewal")} renewals{failedThisWeek ? `, ${failedThisWeek} failed` : ""}</span>
             </p>
             {reminders.canEdit ? <RemindersForm firmSlug={firm.slug} settings={reminders.settings} /> : <p className="text-muted">Only practice administrators can change these.</p>}
           </div>

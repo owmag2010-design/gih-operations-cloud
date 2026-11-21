@@ -2017,8 +2017,8 @@ export const portalUploads = pgTable("portal_uploads", {
 
 /* ───────────────────── Reminders and automation ───────────────────── */
 
-export const reminderKind = pgEnum("reminder_kind", ["client_documents", "staff_digest"]);
-export const reminderStatus = pgEnum("reminder_status", ["claimed", "sent", "not_configured", "failed"]);
+export const reminderKind = pgEnum("reminder_kind", ["client_documents", "staff_digest", "overdue_task", "expiry_renewal"]);
+export const reminderStatus = pgEnum("reminder_status", ["claimed", "sent", "not_configured", "failed", "done"]);
 
 /** Per practice. Everything starts off: nothing is sent until a practice administrator turns it on. */
 export const reminderSettings = pgTable("reminder_settings", {
@@ -2028,6 +2028,12 @@ export const reminderSettings = pgTable("reminder_settings", {
   staffDigest: boolean("staff_digest").notNull().default(false),
   deadlineWindowDays: integer("deadline_window_days").notNull().default(7),
   expiryWindowDays: integer("expiry_window_days").notNull().default(90),
+  /** Automation: a task for the matter's case manager when a client document is this many days overdue. */
+  overdueTasks: boolean("overdue_tasks").notNull().default(false),
+  overdueTaskAfterDays: integer("overdue_task_after_days").notNull().default(3),
+  /** Automation: request a renewed copy this many days before an accepted document expires. */
+  renewBeforeExpiry: boolean("renew_before_expiry").notNull().default(false),
+  renewDaysBefore: integer("renew_days_before").notNull().default(60),
   updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
   updatedAt: updatedAt(),
 });
@@ -2041,7 +2047,7 @@ export const reminderLog = pgTable(
     kind: reminderKind("kind").notNull(),
     matterId: uuid("matter_id"),
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
-    recipient: citext("recipient").notNull(),
+    recipient: citext("recipient"),
     dedupeKey: text("dedupe_key").notNull(),
     items: integer("items").notNull(),
     status: reminderStatus("status").notNull().default("claimed"),
