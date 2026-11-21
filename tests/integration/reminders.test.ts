@@ -24,6 +24,7 @@ vi.mock("../../src/server/integrations/email", async (orig) => {
 const day = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const TODAY = day(0);
 const on = { clientNudges: true, nudgeEveryDays: 7, staffDigest: true, deadlineWindowDays: 7, expiryWindowDays: 90 };
+const rulesOnly = { ...on, clientNudges: false, staffDigest: false, overdueTasks: true, overdueTaskAfterDays: 3, renewBeforeExpiry: true, renewDaysBefore: 60 };
 
 async function setup() {
   sent.length = 0;
@@ -158,5 +159,62 @@ describe("reminders", () => {
     expect(row.status).toBe("not_configured");
     await expect(owner.update(s.reminderLog).set({ status: "sent" }).where(eq(s.reminderLog.id, row.id))).rejects.toThrow();
     await expect(owner.update(s.reminderLog).set({ recipient: "x@y.test" }).where(eq(s.reminderLog.id, row.id))).rejects.toThrow();
+  });
+
+  it("creates one task per overdue required document, for the case manager, only when switched on", async () => {
+    const { veritas, orgId, admin, caseManager, matter } = await setup();
+    await addDocumentRequest(admin, veritas, matter.id, { label: "Passport copy", required: "on", dueOn: day(-5) });
+    await addDocumentRequest(admin, veritas, matter.id, { label: "Bank statements", required: "on", dueOn: day(-1) });
+    await addDocumentRequest(admin, veritas, matter.id, { label: "CV", dueOn: day(-9) });
+    expect((await run(orgId, veritas)).tasks).toBe(0);
+
+    await saveReminderSettings(admin, veritas, rulesOnly);
+    expect((await run(orgId, veritas)).tasks).toBe(1);
+    const made = await owner.select().from(s.tasks).where(eq(s.tasks.matterId, matter.id));
+    expect(made).toHaveLength(1);
+    expect(made[0]).toMatchObject({ title: `Chase Passport copy · ${matter.ref}`, assigneeId: caseManager.user.id, priority: "high", createdById: admin.user.id, status: "open" });
+    expect(made[0].description).toContain("Created automatically");
+
+    // Never twice, even after the task is done; the next document gets its own when it's 3 days late.
+    await owner.update(s.tasks).set({ status: "done", completedAt: new Date() }).where(eq(s.tasks.id, made[0].id));
+    expect((await run(orgId, veritas, day(2))).tasks).toBe(1);
+    expect((await run(orgId, veritas, day(3))).tasks).toBe(0);
+    expect(await owner.select().from(s.tasks).where(eq(s.tasks.matterId, matter.id))).toHaveLength(2);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("asks for a renewed copy before an accepted document expires, once, and not when one is already open", async () => {
+    const { veritas, orgId, admin, matter } = await setup();
+    await saveReminderSettings(admin, veritas, rulesOnly);
+    const accept = async (label: string, expiresOn: string) => {
+      const r = await addDocumentRequest(admin, veritas, matter.id, { label, required: "on", tracksExpiry: "on" });
+      const [file] = await owner.insert(s.documentFiles).values({ firmId: veritas, matterId: matter.id, filename: `${label}.pdf`, contentType: "application/pdf", size: 3, sha256: label, data: Buffer.from("pdf") } as typeof s.documentFiles.$inferInsert).returning();
+      await owner.update(s.documentRequests).set({ status: "accepted", fileId: file.id, reviewerId: admin.user.id, reviewedAt: new Date(), expiresOn }).where(eq(s.documentRequests.id, r.id));
+      return r;
+    };
+    const passport = await accept("Passport", day(45));
+    await accept("Medical certificate", day(200));
+    await accept("Police clearance", day(30));
+    // Staff already asked for a new police clearance by hand.
+    await addDocumentRequest(admin, veritas, matter.id, { label: "Police clearance", required: "on" });
+
+    expect((await run(orgId, veritas)).renewals).toBe(1);
+    const open = await owner.select().from(s.documentRequests).where(and(eq(s.documentRequests.matterId, matter.id), eq(s.documentRequests.label, "Passport"), eq(s.documentRequests.status, "requested")));
+    expect(open).toHaveLength(1);
+    expect(open[0]).toMatchObject({ tracksExpiry: true, required: true, clientVisible: true, dueOn: day(31) });
+    expect(open[0].guidance).toContain("expires on");
+    const [ev] = await owner.select().from(s.documentRequestEvents).where(eq(s.documentRequestEvents.requestId, open[0].id));
+    expect(ev).toMatchObject({ actorId: null, toStatus: "requested" });
+    expect(ev.note).toContain("Requested automatically");
+    expect(passport.id).not.toBe(open[0].id);
+
+    // Once only.
+    expect((await run(orgId, veritas, day(1))).renewals).toBe(0);
+  });
+
+  it("checks the rule limits", async () => {
+    const { veritas, admin } = await setup();
+    await expect(saveReminderSettings(admin, veritas, { ...rulesOnly, overdueTaskAfterDays: 0 })).rejects.toBeInstanceOf(ValidationError);
+    await expect(saveReminderSettings(admin, veritas, { ...rulesOnly, renewDaysBefore: 7 })).rejects.toBeInstanceOf(ValidationError);
   });
 });

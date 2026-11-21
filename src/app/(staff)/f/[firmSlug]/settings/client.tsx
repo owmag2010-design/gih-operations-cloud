@@ -40,7 +40,7 @@ export function PoliciesForm({ firmSlug, policies }: { firmSlug: string; policie
   );
 }
 
-type Reminders = { clientNudges: boolean; nudgeEveryDays: number; staffDigest: boolean; deadlineWindowDays: number; expiryWindowDays: number };
+type Reminders = { clientNudges: boolean; nudgeEveryDays: number; staffDigest: boolean; deadlineWindowDays: number; expiryWindowDays: number; overdueTasks: boolean; overdueTaskAfterDays: number; renewBeforeExpiry: boolean; renewDaysBefore: number };
 
 export function RemindersForm({ firmSlug, settings }: { firmSlug: string; settings: Reminders }) {
   const [state, action] = useActionState(saveRemindersAction.bind(null, firmSlug), null);
@@ -58,6 +58,13 @@ export function RemindersForm({ firmSlug, settings }: { firmSlug: string; settin
           <Field label="Deadlines within" name="deadlineWindowDays" hint="Days, 1 to 60." error={err("deadlineWindowDays")}><Input type="number" min={1} max={60} defaultValue={settings.deadlineWindowDays} className="w-28" required /></Field>
           <Field label="Documents expiring within" name="expiryWindowDays" hint="Days, 14 to 365." error={err("expiryWindowDays")}><Input type="number" min={14} max={365} defaultValue={settings.expiryWindowDays} className="w-28" required /></Field>
         </div>
+      </div>
+      <div className="flex flex-col gap-2 border-t border-hairline pt-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Automation rules</p>
+        <Checkbox name="overdueTasks" defaultChecked={settings.overdueTasks} label={<><span className="text-ink">Create a task when a required client document is overdue.</span> One high-priority task per document, for the matter&apos;s case manager (or consultant), due the same day.</>} />
+        <Field label="Days overdue before the task" name="overdueTaskAfterDays" hint="Days, 1 to 60." error={err("overdueTaskAfterDays")}><Input type="number" min={1} max={60} defaultValue={settings.overdueTaskAfterDays} className="w-28" required /></Field>
+        <Checkbox name="renewBeforeExpiry" defaultChecked={settings.renewBeforeExpiry} label={<><span className="text-ink">Ask for a renewed copy before an accepted document expires.</span> Only documents with an expiry date recorded. A new request is added to the matter (shown to the client if the original was) and logged as automatic.</>} />
+        <Field label="Days before expiry" name="renewDaysBefore" hint="Days, 14 to 365." error={err("renewDaysBefore")}><Input type="number" min={14} max={365} defaultValue={settings.renewDaysBefore} className="w-28" required /></Field>
       </div>
       <div><SubmitButton>Save reminders</SubmitButton></div>
     </form>

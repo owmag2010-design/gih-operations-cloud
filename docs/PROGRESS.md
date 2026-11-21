@@ -1,5 +1,14 @@
 # Progress Log
 
+## 21 Nov 2026: Automation rules (branch `automation-rules`, stacked on `reminders-automation`)
+**Done (tested):**
+- **Task when a client document is overdue**: one high-priority task per required document, for the case manager (or consultant), after a practice-set number of days (default 3). Never twice for the same document.
+- **Renewal before expiry**: a new request for the same document and person, a set number of days (default 60) before an accepted document expires. Due two weeks before expiry, shown to the client when the original was, and recorded as automatic in the request history and on the timeline. Skipped when the same document is already open again. Resolves L75 and L81.
+- Both are off by default and sit in Settings › Reminders and automation; they run in the daily job before the reminders, each item claimed and acted on in one transaction.
+- Migrations 0034–0035. Tests: 155 unit/integration (3 new) and 22 end-to-end, all passing.
+
+**Next:** integrations (WhatsApp reminders through the approved Infobip templates, accounting), as Owen prioritises.
+
 ## 21 Nov 2026: Reminders and automation (branch `reminders-automation`, stacked on `client-portal-integrated`)
 **Done (tested):**
 - **Client reminders** by email through the portal: required, client-visible documents still outstanding, when one is due within 3 days, a new copy was asked for, or the practice's interval (3 to 30 days) has passed. At most once per interval per matter. Docs: docs/23-reminders.md.
