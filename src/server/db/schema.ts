@@ -12,6 +12,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigserial,
+  unique,
   boolean,
   customType,
   date,
@@ -2013,3 +2014,38 @@ export const portalUploads = pgTable("portal_uploads", {
   driveError: text("drive_error"),
   createdAt: createdAt(),
 });
+
+/* ───────────────────── Reminders and automation ───────────────────── */
+
+export const reminderKind = pgEnum("reminder_kind", ["client_documents", "staff_digest"]);
+export const reminderStatus = pgEnum("reminder_status", ["claimed", "sent", "not_configured", "failed"]);
+
+/** Per practice. Everything starts off: nothing is sent until a practice administrator turns it on. */
+export const reminderSettings = pgTable("reminder_settings", {
+  firmId: uuid("firm_id").primaryKey().references(() => firms.id),
+  clientNudges: boolean("client_nudges").notNull().default(false),
+  nudgeEveryDays: integer("nudge_every_days").notNull().default(7),
+  staffDigest: boolean("staff_digest").notNull().default(false),
+  deadlineWindowDays: integer("deadline_window_days").notNull().default(7),
+  expiryWindowDays: integer("expiry_window_days").notNull().default(90),
+  updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: updatedAt(),
+});
+
+/** One row per reminder sent (or attempted). The dedupe key makes each reminder go once, however often the job runs. */
+export const reminderLog = pgTable(
+  "reminder_log",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    kind: reminderKind("kind").notNull(),
+    matterId: uuid("matter_id"),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    recipient: citext("recipient").notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    items: integer("items").notNull(),
+    status: reminderStatus("status").notNull().default("claimed"),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("reminder_log_dedupe_uq").on(t.firmId, t.dedupeKey), index("reminder_log_matter_idx").on(t.matterId, t.createdAt)],
+);

@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { useActionState, useTransition } from "react";
 import { ActionFeedback, fieldError, SubmitButton } from "@/components/ui/forms";
 import { Badge, Button, Checkbox, Field, Input, Select } from "@/components/ui/primitives";
-import { addDepartmentAction, addStageAction, moveStageAction, updatePoliciesAction, updateProfileAction, updateStageAction } from "../actions";
+import { addDepartmentAction, addStageAction, moveStageAction, saveRemindersAction, updatePoliciesAction, updateProfileAction, updateStageAction } from "../actions";
 
 type Profile = { legalName: string; tradingName: string; brandColor: string; website: string | null; emailDomain: string | null; contactEmail: string | null; contactPhone: string | null; jurisdictions: string[] };
 
@@ -36,6 +36,30 @@ export function PoliciesForm({ firmSlug, policies }: { firmSlug: string; policie
       <Checkbox name="allowGroupAdminAccess" defaultChecked={policies.allowGroupAdminAccess} label={<><span className="text-ink">Let Hub super administrators add themselves to this firm.</span> Each time it happens it is recorded in the audit log.</>} />
       <Checkbox name="requireMfaForAll" defaultChecked={policies.requireMfaForAll} label={<><span className="text-ink">Require two-step sign-in for everyone in this firm.</span> Administrators always need it.</>} />
       <div><SubmitButton>Save policies</SubmitButton></div>
+    </form>
+  );
+}
+
+type Reminders = { clientNudges: boolean; nudgeEveryDays: number; staffDigest: boolean; deadlineWindowDays: number; expiryWindowDays: number };
+
+export function RemindersForm({ firmSlug, settings }: { firmSlug: string; settings: Reminders }) {
+  const [state, action] = useActionState(saveRemindersAction.bind(null, firmSlug), null);
+  const err = (n: string) => fieldError(state, n);
+  return (
+    <form action={action} className="flex flex-col gap-4">
+      <ActionFeedback state={state} />
+      <div className="flex flex-col gap-2">
+        <Checkbox name="clientNudges" defaultChecked={settings.clientNudges} label={<><span className="text-ink">Remind clients about documents they still owe.</span> Only clients with an open portal, only for required documents they can see, and only when one is due within three days, a new copy was asked for, or the request has waited the interval below.</>} />
+        <Field label="Remind a client at most every" name="nudgeEveryDays" hint="Days, 3 to 30." error={err("nudgeEveryDays")}><Input type="number" min={3} max={30} defaultValue={settings.nudgeEveryDays} className="w-28" required /></Field>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Checkbox name="staffDigest" defaultChecked={settings.staffDigest} label={<><span className="text-ink">Email each team member a daily digest.</span> Deadlines coming up, overdue client documents, documents waiting for their review, and accepted documents about to expire, on open matters they&apos;re on. Nobody gets an empty email.</>} />
+        <div className="flex flex-wrap gap-4">
+          <Field label="Deadlines within" name="deadlineWindowDays" hint="Days, 1 to 60." error={err("deadlineWindowDays")}><Input type="number" min={1} max={60} defaultValue={settings.deadlineWindowDays} className="w-28" required /></Field>
+          <Field label="Documents expiring within" name="expiryWindowDays" hint="Days, 14 to 365." error={err("expiryWindowDays")}><Input type="number" min={14} max={365} defaultValue={settings.expiryWindowDays} className="w-28" required /></Field>
+        </div>
+      </div>
+      <div><SubmitButton>Save reminders</SubmitButton></div>
     </form>
   );
 }
