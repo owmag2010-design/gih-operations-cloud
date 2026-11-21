@@ -19,6 +19,7 @@ import { listTasks, taskFormOptions } from "@/server/modules/tasks/tasks";
 import { requireFirm } from "@/server/next/session";
 import { DocumentsPanel } from "../../documents/matter-panel";
 import { PortalPanel } from "./portal-panel";
+import { matterReminders } from "@/server/modules/reminders/reminders";
 import { Timeline } from "../../timeline";
 import {
   AdjustDateDialog, CompleteDateButton, DateDialogs, EditMatterDialog, FactDialog, PersonDialog, RemoveFactButton, RemovePersonButton, StageBar, TeamControls, VerifyFactDialog,
@@ -40,11 +41,12 @@ export default async function MatterPage({ params, searchParams }: PageProps<"/f
   const sp = await searchParams;
   const base = `/f/${firm.slug}`;
   const canEdit = ctx.has("matters:edit", firm.firmId);
-  const [taskRows, options, notes, teamOptions] = await Promise.all([
+  const [taskRows, options, notes, teamOptions, reminders] = await Promise.all([
     listTasks(ctx, { view: "all", status: "all", matterId: matter.id }),
     taskFormOptions(ctx),
     listNotes(ctx, firm.firmId, { matterId: matter.id }),
     ctx.has("matters:create", firm.firmId) ? matterFormOptions(ctx, firm.firmId).then((o) => o.team) : Promise.resolve([] as { id: string; name: string }[]),
+    matterReminders(ctx, firm.firmId, matter.id),
   ]);
   const teamList = teamOptions.length ? teamOptions : options.people.filter((p) => p.firmId === firm.firmId).map((p) => ({ id: p.id, name: p.name }));
   const tasks = taskRows.filter((t) => t.status !== "cancelled").map((t) => ({ ...t, dueAt: t.dueAt?.toISOString() ?? null, reminderAt: t.reminderAt?.toISOString() ?? null, completedAt: t.completedAt?.toISOString() ?? null }));
@@ -178,6 +180,13 @@ export default async function MatterPage({ params, searchParams }: PageProps<"/f
             />
             {view.requests.checklists.length ? (
               <p className="border-b border-hairline px-4 py-2 text-xs text-muted">From: {view.requests.checklists.map((c) => `${c.name} v${c.version}${c.status === "published" ? "" : " (a newer version exists)"}`).join(" · ")}</p>
+            ) : null}
+            {view.requests.requests.length ? (
+              <p className="border-b border-hairline px-4 py-2 text-xs text-muted">
+                Client reminders: {reminders.enabled ? `on, at most every ${reminders.everyDays} days, through the client portal` : "off for this practice"}
+                {reminders.sent.length ? ` · last sent ${reminders.sent[0].createdAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} (${reminders.sent[0].items} document${reminders.sent[0].items === 1 ? "" : "s"}${reminders.sent[0].status === "sent" ? "" : `, ${reminders.sent[0].status === "not_configured" ? "email not set up" : reminders.sent[0].status}`})` : ""}
+                {!reminders.enabled && ctx.has("firm:manage", firm.firmId) ? <> · <Link className="underline" href={`${base}/settings#reminders`}>Settings</Link></> : null}
+              </p>
             ) : null}
             {canEdit ? <ApplyChecklistForm slug={firm.slug} matterId={matter.id} options={view.checklistsAvailable} /> : null}
             {canEdit && !view.checklistsAvailable.length && !view.requests.checklists.length ? (

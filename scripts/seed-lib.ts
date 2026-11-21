@@ -105,6 +105,9 @@ const FIRMS = [
   },
 ] as const;
 
+/** Owen, 21 Nov 2026: every practice uses its Australian registration. Set only where none is recorded, so later edits stay. */
+const REGISTERED_COUNTRY = "AU";
+
 const OFFICES = [
   { key: "pretoria", name: "Pretoria Centre", addressLine1: "115 Paul Kruger Street", addressLine2: "New Court Chambers", city: "Pretoria", country: "ZA", timezone: "Africa/Johannesburg", firms: ["veritas", "mimshac"] },
   { key: "harare", name: "Harare Centre", addressLine1: "Office 2, 12th Floor", addressLine2: "Joina City", city: "Harare", country: "ZW", timezone: "Africa/Harare", firms: ["veritas", "mimshac"] },
@@ -145,6 +148,10 @@ export async function runSeed(db: NodePgDatabase<typeof s>, log: (m: string) => 
         log(`  + firm ${f.tradingName}`);
       }
       firmIds[f.slug] = firm.id;
+      if (!firm.registeredCountry) {
+        await tx.update(s.firms).set({ registeredCountry: REGISTERED_COUNTRY }).where(eq(s.firms.id, firm.id));
+        log(`  ~ ${f.tradingName}: registered country ${REGISTERED_COUNTRY}`);
+      }
 
       // Pipeline stages
       for (const [i, st] of DEFAULT_PIPELINE.entries()) {

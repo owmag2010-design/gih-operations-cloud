@@ -1,5 +1,18 @@
 # Progress Log
 
+## 21 Nov 2026: Reminders and automation (branch `reminders-automation`, stacked on `client-portal-integrated`)
+**Done (tested):**
+- **Client reminders** by email through the portal: required, client-visible documents still outstanding, when one is due within 3 days, a new copy was asked for, or the practice's interval (3 to 30 days) has passed. At most once per interval per matter. Docs: docs/23-reminders.md.
+- **Daily team digest** per person: deadlines coming up, overdue client documents, documents waiting for their review, and accepted documents about to expire, on open matters they're on (restricted matters only for their team). Nobody gets an empty email.
+- **Off by default**: a practice administrator switches each on in Settings › Reminders (audited). The matter page shows whether client reminders are on and when the last one went.
+- **Sent once**: each reminder is claimed in an append-only log before sending, so re-runs on the same day send nothing new. Daily Vercel Cron at 04:47 UTC.
+- **Registered country**: Owen confirmed every practice uses its Australian registration; the seed sets AU where none is recorded (edits are kept).
+- Migrations 0032–0033 (firm isolation, restricted-matter policy, limits, locked log). Tests: 152 unit/integration (5 new) and 22 end-to-end (1 new, with axe), all passing.
+
+**Waiting on Owen:** switch reminders on per practice when ready (nothing goes to clients until then); `RESEND_API_KEY` for real sending.
+
+**Next:** automation rules (tasks when documents are overdue, replacement requests before expiry), then integrations.
+
 ## 21 Nov 2026: Client portal joined to document requests (branch `client-portal-integrated`, stacked on `country-checklists`; supersedes PR #1)
 **Done (tested):**
 - The client portal from PR #1 (2 Nov entry below) now runs on top of countries and checklists. Its separate checklist (`portal_checklist_items`) is gone: the portal's Documents tab shows the matter's client-visible, non-waived **document requests**, grouped by person, with guidance, due date and the reason when a replacement is asked for.

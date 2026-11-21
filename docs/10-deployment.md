@@ -82,4 +82,4 @@ After adding variables, redeploy. Settings › Email shows each connection as Re
 
 ## Airtable mirror (milestone 2)
 - `AIRTABLE_TOKEN`: an Airtable personal access token with `data.records:read` and `schema.bases:read`, limited to the mirrored bases (see docs/16-airtable-mirror.md). Production only.
-- Cron: `/api/cron/airtable-sync` every 15 minutes (in `vercel.json`), authorised by `CRON_SECRET`.
+- Cron: `/api/cron/airtable-sync` every 15 minutes and `/api/cron/reminders` daily at 04:47 UTC (in `vercel.json`), authorised by `CRON_SECRET`. Reminders send nothing until a practice switches them on (docs/23-reminders.md).
