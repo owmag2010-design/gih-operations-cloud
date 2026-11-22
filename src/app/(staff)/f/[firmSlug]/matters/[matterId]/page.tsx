@@ -18,6 +18,7 @@ import { listNotes } from "@/server/modules/notes/notes";
 import { listTasks, taskFormOptions } from "@/server/modules/tasks/tasks";
 import { requireFirm } from "@/server/next/session";
 import { DocumentsPanel } from "../../documents/matter-panel";
+import { PortalPanel } from "./portal-panel";
 import { Timeline } from "../../timeline";
 import {
   AdjustDateDialog, CompleteDateButton, DateDialogs, EditMatterDialog, FactDialog, PersonDialog, RemoveFactButton, RemovePersonButton, StageBar, TeamControls, VerifyFactDialog,
@@ -192,6 +193,7 @@ export default async function MatterPage({ params, searchParams }: PageProps<"/f
             ) : null}
             {canEdit ? <AdHocRequestForm slug={firm.slug} matterId={matter.id} people={peopleNames} /> : null}
           </Panel>
+          <PortalPanel ctx={ctx} firmId={firm.firmId} slug={firm.slug} matterId={matter.id} />
 
           <DocumentsPanel ctx={ctx} firmId={firm.firmId} slug={firm.slug} link={{ matterId: matter.id }} />
 

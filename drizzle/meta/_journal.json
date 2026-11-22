@@ -218,6 +218,13 @@
       "when": 1795192734832,
       "tag": "0030_checklists_security",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795196334832,
+      "tag": "0031_client_portal",
+      "breakpoints": true
     }
   ]
 }
