@@ -1,5 +1,20 @@
 # Progress Log
 
+## 21 Nov 2026: Countries and jurisdictions (AU, NZ, ZA native)
+**Done (tested), branch `countries-jurisdictions`:**
+- **Country profiles** (`src/server/modules/countries`, docs/19-countries.md): currency, date format, phone prefix, time zones, address format and authorities per country, with version history and review (draft → in review → verified → operational → retired). Editing a verified or operational profile returns it to draft. Hub › Settings › Countries; new countries need no code. Starting drafts for AU, NZ, ZA and ZW from `data/config/countries.json`.
+- **Holiday calendars**: ZA national, NZ national, AU NSW and ACT for 2026–2027, from official pages, as drafts. Deadline rules can name a calendar; business days skip its dates only once it's verified (closes L40). Verified dates are locked by a trigger.
+- **Sources register** with effective dates, responsible reviewer and next review; **practice-by-country checks** (payments, accounting, messaging, email, e-signature, privacy, professional regulation, data residency) per legal entity.
+- **Three kinds of country kept apart**: matters record destination and the office (and so country) they're handled from; clients record nationality, other nationalities and residence; the matter page shows all four.
+- **Client-facing gate**: a proposal can't be sent unless every destination in it is operational.
+- **NZD** added to services and proposals (shared `CURRENCIES`); money parsing reads NZ$ and A$.
+- Migrations 0027–0028 (org-scoped row-level security, composite keys, append-only history). New permissions `countries:manage`, `countries:review` (Group Super Administrator).
+- Tests: 132 unit/integration (13 new) and 19 end-to-end (3 new, with axe), all passing.
+
+**Waiting on Owen:** review ZA and make it operational before sending proposals from this app; confirm each practice's registered country; decide ZW currency (USD or ZWG).
+
+**Next:** country-specific workflow templates and document checklists (versioned per country and service), then the client portal.
+
 ## 2 Nov 2026: Conversations from the enquiry engine (read-only, Phase B step 1)
 **Done (tested):**
 - **Conversations** (`/conversations`, `src/server/modules/conversations`): every WhatsApp, email, form and website-chat conversation the Hub enquiry engine has had, in a three-panel screen (queues and list, the whole thread across channels, the client panel with proposal and the engine instructions). Queues: client waiting, team handling, proposal out, paid, by channel, and Hub conversations not yet matched to a practice. Search by name, email, phone, matter or proposal reference; tests hidden unless asked; refreshes every 20 seconds.

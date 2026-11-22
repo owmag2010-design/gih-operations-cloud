@@ -23,7 +23,7 @@ import { getServiceWithHistory, listCatalogue, parseMoney, updateService } from 
 import { withScope } from "../../src/server/db/client";
 import * as s from "../../src/server/db/schema";
 import { AccessDeniedError, ConflictError, NotFoundError, ValidationError } from "../../src/server/errors";
-import { auditCount, firmId, lead, makeUser, owner, resetDatabase } from "../support/fixtures";
+import { auditCount, firmId, lead, makeUser, owner, resetDatabase, setCountryStatus } from "../support/fixtures";
 
 const tokenOf = (url: string) => url.split("/p/")[1];
 
@@ -83,7 +83,11 @@ describe("services and fees", () => {
 });
 
 describe("proposals", () => {
-  beforeEach(resetDatabase);
+  beforeEach(async () => {
+    await resetDatabase();
+    // Sending to a client needs the destination country to be operational (Settings › Countries).
+    await setCountryStatus("ZA", "operational");
+  });
 
   it("runs a lead through draft, review, approval, release and client acceptance", async () => {
     const { veritas, admin, consultant, lead: l, catalogue } = await setup();

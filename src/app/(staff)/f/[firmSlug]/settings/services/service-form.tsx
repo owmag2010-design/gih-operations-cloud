@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { ActionFeedback, fieldError, SubmitButton } from "@/components/ui/forms";
 import { Button, Checkbox, Field, Input, Select } from "@/components/ui/primitives";
 import type { ActionResult } from "@/server/errors";
+import { CURRENCIES } from "@/lib/countries";
 
 type Line = { label: string; amount: string; kind: string };
 export type ServiceFormValues = { name: string; category: string; jurisdiction: string; currency: string; deposit: string; isActive: boolean; lines: Line[] };
@@ -47,7 +48,7 @@ export function ServiceForm({
         <div className="grid grid-cols-2 gap-4">
           <Field label="Country" name="jurisdiction" hint="Two letters, e.g. ZA" error={err("jurisdiction")}><Input defaultValue={initial.jurisdiction} maxLength={2} required className="uppercase" /></Field>
           <Field label="Currency" name="currency" error={err("currency")}>
-            <Select defaultValue={initial.currency}>{["ZAR", "AUD", "USD", "GBP", "EUR"].map((c) => <option key={c}>{c}</option>)}</Select>
+            <Select defaultValue={initial.currency}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select>
           </Field>
         </div>
       </div>

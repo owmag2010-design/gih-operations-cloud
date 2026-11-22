@@ -4,3 +4,7 @@ export const COUNTRIES: readonly (readonly [string, string])[] = [["AF","Afghani
 const byCode = new Map(COUNTRIES.map(([c, n]) => [c, n]));
 export const countryName = (code: string | null | undefined) => (code ? (byCode.get(code) ?? code) : "");
 export const isCountryCode = (code: string) => byCode.has(code);
+
+/** Currencies the platform prices and invoices in. AUD, NZD and ZAR are the launch jurisdictions' own. */
+export const CURRENCIES = ["AUD", "NZD", "ZAR", "USD", "GBP", "EUR"] as const;
+export type Currency = (typeof CURRENCIES)[number];

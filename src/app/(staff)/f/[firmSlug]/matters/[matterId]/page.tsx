@@ -75,7 +75,7 @@ export default async function MatterPage({ params, searchParams }: PageProps<"/f
             {ctx.has("email:send", firm.firmId) ? <ComposeDialog firmId={firm.firmId} target={{ clientId: client.id }} to={client.email} /> : null}
             <EventDialog practices={[]} fixed={{ firmId: firm.firmId, matterId: matter.id, label }} trigger={<Button><CalendarPlus /> Schedule</Button>} />
             <TaskDialog options={options} meId={ctx.user.id} fixed={{ firmId: firm.firmId, matterId: matter.id, label }} trigger={<Button><Plus /> Task</Button>} />
-            {canEdit ? <EditMatterDialog slug={firm.slug} matter={matter} team={teamList} canRestrict={canRestrict} /> : null}
+            {canEdit ? <EditMatterDialog slug={firm.slug} matter={matter} team={teamList} canRestrict={canRestrict} offices={view.offices} /> : null}
           </>
         }
       />
@@ -199,7 +199,10 @@ export default async function MatterPage({ params, searchParams }: PageProps<"/f
                   ["Reference", <span key="r" className="num">{matter.ref}</span>],
                   ["Service", service?.name],
                   ["Legal category", matter.legalCategory],
-                  ["Jurisdiction", countryName(matter.jurisdiction)],
+                  ["Destination", matter.jurisdiction ? <span key="d">{countryName(matter.jurisdiction)}{view.destinationStatus !== "operational" ? <span className="ml-1.5 text-xs text-warn">{view.destinationStatus ? `profile ${view.destinationStatus.replace("_", " ")}` : "no country profile"}</span> : null}</span> : null],
+                  ["Handled from", matter.operatingOfficeId ? `${view.offices.find((o) => o.id === matter.operatingOfficeId)?.name ?? "Office"} (${countryName(matter.operatingCountry)})` : null],
+                  ["Client nationality", [client.nationality, ...(client.otherNationalities ?? [])].filter(Boolean).map((c) => countryName(c)).join(", ") || null],
+                  ["Client lives in", countryName(client.countryOfResidence) || null],
                   ["Proposal", proposal ? <Link key="p" href={`${base}/proposals/${proposal.id}`} className="num text-ink underline-offset-2 hover:underline">{proposal.ref}</Link> : null],
                   ["Submitted", matter.submittedOn ? `${matter.submittedOn}${matter.submissionChannel ? ` via ${matter.submissionChannel}` : ""}` : null],
                   ["Submission ref.", matter.submissionReference],

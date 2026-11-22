@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ShieldCheck, ShieldOff } from "lucide-react";
-import { useActionState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { ActionFeedback, fieldError, SubmitButton } from "@/components/ui/forms";
 import { Badge, Button, Checkbox, Field, Input, Select } from "@/components/ui/primitives";
@@ -94,15 +94,25 @@ export function TemplateToggle({ slug, t }: { slug: string; t: Template }) {
   return <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => setTaskTemplateActiveAction(slug, t.id, !t.isActive))}>{t.isActive ? "Turn off" : "Turn on"}</Button>;
 }
 
-export function DeadlineRuleForm({ slug }: { slug: string }) {
+type CalendarOption = { id: string; name: string; countryCode: string; status: string };
+
+export function DeadlineRuleForm({ slug, countries, calendars }: { slug: string; countries: { code: string; name: string }[]; calendars: CalendarOption[] }) {
   const [state, action] = useActionState(saveDeadlineRuleAction.bind(null, slug, null), null);
+  const [country, setCountry] = useState(countries.find((c) => c.code === "ZA")?.code ?? countries[0]?.code ?? "");
+  const [business, setBusiness] = useState(false);
+  const options = calendars.filter((c) => c.countryCode === country && c.status !== "retired");
   return (
     <form action={action} className="grid gap-3 border-t border-hairline p-4 sm:grid-cols-6">
       <div className="sm:col-span-6"><ActionFeedback state={state} /></div>
       <Field label="Rule name" name="name" idPrefix="dr" error={fieldError(state, "name")} className="sm:col-span-3"><Input required maxLength={120} /></Field>
-      <Field label="Country" name="jurisdiction" idPrefix="dr" error={fieldError(state, "jurisdiction")}><Select defaultValue="ZA"><option value="ZA">South Africa</option><option value="ZW">Zimbabwe</option><option value="AU">Australia</option><option value="GB">United Kingdom</option></Select></Field>
+      <Field label="Country" name="jurisdiction" idPrefix="dr" error={fieldError(state, "jurisdiction")}><Select value={country} onChange={(e) => setCountry(e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</Select></Field>
       <Field label="Days" name="offsetDays" idPrefix="dr" error={fieldError(state, "offsetDays")}><Input type="number" required min={-3650} max={3650} /></Field>
-      <div className="flex items-end pb-2"><Checkbox name="businessDays" label="Business days" /></div>
+      <div className="flex items-end pb-2"><Checkbox name="businessDays" label="Business days" checked={business} onChange={(e) => setBusiness(e.target.checked)} /></div>
+      {business ? (
+        <Field label="Public holidays to skip" name="calendarId" idPrefix="dr" className="sm:col-span-6" hint={options.length ? "Only a verified calendar is used; a draft one stops the rule calculating until it's verified." : "No holiday calendar for this country yet: only weekends will be skipped. Add one in Hub settings › Countries."} error={fieldError(state, "calendarId")}>
+          <Select defaultValue="" key={country}><option value="">Weekends only</option>{options.map((c) => <option key={c.id} value={c.id}>{c.name}{c.status === "verified" ? "" : " (draft)"}</option>)}</Select>
+        </Field>
+      ) : null}
       <Field label="Counted from" name="fromLabel" idPrefix="dr" error={fieldError(state, "fromLabel")} className="sm:col-span-3"><Input required maxLength={120} placeholder="e.g. the date the decision was received" /></Field>
       <Field label="Source" name="source" idPrefix="dr" hint="The provision, regulation or official page the rule comes from." error={fieldError(state, "source")} className="sm:col-span-3"><Input required maxLength={500} /></Field>
       <div className="sm:col-span-6"><SubmitButton>Add rule</SubmitButton></div>

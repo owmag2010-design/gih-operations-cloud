@@ -141,6 +141,8 @@ export const firms = pgTable(
     contactEmail: text("contact_email"),
     contactPhone: text("contact_phone"),
     jurisdictions: text("jurisdictions").array().notNull().default(sql`'{}'::text[]`),
+    /** Country where this legal entity is registered; null until confirmed. */
+    registeredCountry: text("registered_country"),
     status: firmStatus("status").notNull().default("active"),
     shareAggregateMetrics: boolean("share_aggregate_metrics").notNull().default(true),
     allowGroupAdminAccess: boolean("allow_group_admin_access").notNull().default(false),
@@ -406,6 +408,7 @@ export const clients = pgTable(
     phone: text("phone"),
     nationality: text("nationality"),
     countryOfResidence: text("country_of_residence"),
+    otherNationalities: text("other_nationalities").array().notNull().default(sql`'{}'::text[]`),
     status: clientStatus("status").notNull().default("active"),
     primaryConsultantId: uuid("primary_consultant_id").references(() => users.id, { onDelete: "set null" }),
     sourceLeadId: uuid("source_lead_id").references(() => leads.id),
@@ -1027,7 +1030,11 @@ export const matters = pgTable(
     title: text("title").notNull(),
     serviceId: uuid("service_id"),
     legalCategory: text("legal_category"),
+    /** Destination country of the application (ISO code). */
     jurisdiction: text("jurisdiction"),
+    /** Where the practice handles the matter from: the office, and that office's country. */
+    operatingOfficeId: uuid("operating_office_id").references(() => offices.id, { onDelete: "set null" }),
+    operatingCountry: text("operating_country"),
     stageId: uuid("stage_id").notNull(),
     caseManagerId: uuid("case_manager_id").references(() => users.id, { onDelete: "set null" }),
     consultantId: uuid("consultant_id").references(() => users.id, { onDelete: "set null" }),
@@ -1126,6 +1133,8 @@ export const deadlineRules = pgTable(
     jurisdiction: text("jurisdiction").notNull(),
     offsetDays: integer("offset_days").notNull(),
     businessDays: boolean("business_days").notNull().default(false),
+    /** Public holidays to skip when counting business days (only a verified calendar is used). */
+    calendarId: uuid("calendar_id"),
     fromLabel: text("from_label").notNull(),
     source: text("source").notNull(),
     validatedById: uuid("validated_by_id").references(() => users.id, { onDelete: "set null" }),
@@ -1683,4 +1692,159 @@ export const documentFiles = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("document_files_matter_idx").on(t.matterId), index("document_files_client_idx").on(t.clientId), index("document_files_firm_idx").on(t.firmId, t.createdAt)],
+);
+
+/* ───────────────────── Countries and jurisdictions ───────────────────── */
+/*
+ * Organisation-level configuration. A country profile being present does not
+ * mean its services are verified: `status` records how far review has gone, and
+ * client-facing use (sending proposals) needs the profile to be operational.
+ */
+
+export const countryStatus = pgEnum("country_status", ["draft", "in_review", "verified", "operational", "retired"]);
+export const calendarStatus = pgEnum("calendar_status", ["draft", "verified", "retired"]);
+export const sourceKind = pgEnum("jurisdiction_source_kind", ["legislation", "official_fees", "requirements", "checklist", "holidays", "guidance", "other"]);
+export const sourceStatus = pgEnum("jurisdiction_source_status", ["draft", "verified", "superseded"]);
+export const capabilityArea = pgEnum("capability_area", ["payments", "accounting", "messaging", "email", "e_signature", "privacy", "professional_regulation", "data_residency"]);
+export const capabilityStatus = pgEnum("capability_status", ["not_assessed", "pending", "verified", "unavailable", "not_needed"]);
+
+export type AddressField = { key: string; label: string; required: boolean };
+export type CountryAuthority = { name: string; kind: "immigration" | "education" | "professional" | "privacy" | "other"; url: string | null };
+
+export const countryProfiles = pgTable(
+  "country_profiles",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    /** ISO 3166-1 alpha-2. */
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    currency: text("currency").notNull(),
+    /** date-fns pattern, e.g. dd/MM/yyyy. */
+    dateFormat: text("date_format").notNull(),
+    phonePrefix: text("phone_prefix"),
+    timezones: text("timezones").array().notNull().default(sql`'{}'::text[]`),
+    defaultTimezone: text("default_timezone").notNull(),
+    addressFormat: jsonb("address_format").$type<AddressField[]>().notNull().default([]),
+    authorities: jsonb("authorities").$type<CountryAuthority[]>().notNull().default([]),
+    notes: text("notes"),
+    status: countryStatus("status").notNull().default("draft"),
+    version: integer("version").notNull().default(1),
+    submittedById: uuid("submitted_by_id").references(() => users.id, { onDelete: "set null" }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    reviewedById: uuid("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewNote: text("review_note"),
+    /** True when the person who submitted it also reviewed it (recorded, not hidden). */
+    selfReviewed: boolean("self_reviewed").notNull().default(false),
+    operationalById: uuid("operational_by_id").references(() => users.id, { onDelete: "set null" }),
+    operationalAt: timestamp("operational_at", { withTimezone: true }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("country_profiles_org_code_uq").on(t.orgId, t.code)],
+);
+
+/** Every saved change to a profile, with its status at the time. */
+export const countryProfileVersions = pgTable(
+  "country_profile_versions",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    profileId: uuid("profile_id").notNull().references(() => countryProfiles.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    status: countryStatus("status").notNull(),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull(),
+    reason: text("reason").notNull(),
+    changedById: uuid("changed_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("country_profile_versions_profile_idx").on(t.profileId, t.version)],
+);
+
+/** Public-holiday calendars for business-day deadlines, national (region null) or regional. */
+export const businessCalendars = pgTable(
+  "business_calendars",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    countryCode: text("country_code").notNull(),
+    region: text("region"),
+    name: text("name").notNull(),
+    status: calendarStatus("status").notNull().default("draft"),
+    sourceTitle: text("source_title").notNull(),
+    sourceUrl: text("source_url").notNull(),
+    notes: text("notes"),
+    reviewedById: uuid("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("business_calendars_org_name_uq").on(t.orgId, t.name), index("business_calendars_country_idx").on(t.orgId, t.countryCode)],
+);
+
+export const calendarHolidays = pgTable(
+  "calendar_holidays",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    calendarId: uuid("calendar_id").notNull().references(() => businessCalendars.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    name: text("name").notNull(),
+    /** Where this date comes from when it isn't the calendar's own source (a later declaration, for example). */
+    sourceUrl: text("source_url"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("calendar_holidays_cal_date_name_uq").on(t.calendarId, t.date, t.name)],
+);
+
+/** Register of authoritative sources per country: legislation, official fees, requirements, with effective dates and a responsible reviewer. */
+export const jurisdictionSources = pgTable(
+  "jurisdiction_sources",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    countryCode: text("country_code").notNull(),
+    kind: sourceKind("kind").notNull(),
+    title: text("title").notNull(),
+    url: text("url").notNull(),
+    publisher: text("publisher"),
+    versionLabel: text("version_label"),
+    effectiveFrom: date("effective_from"),
+    effectiveTo: date("effective_to"),
+    status: sourceStatus("status").notNull().default("draft"),
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    nextReviewOn: date("next_review_on"),
+    notes: text("notes"),
+    reviewedById: uuid("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    supersededById: uuid("superseded_by_id"),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("jurisdiction_sources_country_idx").on(t.orgId, t.countryCode, t.kind)],
+);
+
+/** What has been checked for each practice (legal entity) in each country: payments, messaging, privacy and so on. */
+export const entityCountryCapabilities = pgTable(
+  "entity_country_capabilities",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organisations.id),
+    firmId: uuid("firm_id").notNull().references(() => firms.id, { onDelete: "cascade" }),
+    countryCode: text("country_code").notNull(),
+    area: capabilityArea("area").notNull(),
+    provider: text("provider"),
+    status: capabilityStatus("status").notNull().default("not_assessed"),
+    note: text("note"),
+    evidenceUrl: text("evidence_url"),
+    reviewedById: uuid("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("entity_country_capabilities_uq").on(t.firmId, t.countryCode, t.area)],
 );
