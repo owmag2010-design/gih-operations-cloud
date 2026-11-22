@@ -12,7 +12,8 @@ import { requireFirm } from "@/server/next/session";
 import { getAiDraftingSetting } from "@/server/modules/documents/documents";
 import { LocalTime } from "@/components/ui/forms";
 import { AiDraftingToggle } from "../consent-client";
-import { DepartmentForm, PoliciesForm, ProfileForm, StageEditor } from "./client";
+import { getReminderSettings } from "@/server/modules/reminders/reminders";
+import { DepartmentForm, PoliciesForm, ProfileForm, RemindersForm, StageEditor } from "./client";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -20,7 +21,9 @@ export default async function SettingsPage({ params }: PageProps<"/f/[firmSlug]/
   const { firmSlug } = await params;
   const { ctx, firm: access } = await requireFirm(firmSlug);
   const { firm, offices, departments } = await getFirmForSettings(ctx, access.firmId);
-  const [stages, services, ai] = await Promise.all([listStages(ctx, firm.id, true), listCatalogue(ctx, firm.id), getAiDraftingSetting(ctx, firm.id)]);
+  const [stages, services, ai, reminders] = await Promise.all([listStages(ctx, firm.id, true), listCatalogue(ctx, firm.id), getAiDraftingSetting(ctx, firm.id), getReminderSettings(ctx, firm.id)]);
+  const sentThisWeek = (kind: string) => reminders.recent.filter((r) => r.kind === kind && r.status !== "failed").reduce((n, r) => n + r.n, 0);
+  const failedThisWeek = reminders.recent.filter((r) => r.status === "failed").reduce((n, r) => n + r.n, 0);
   const canManage = ctx.has("firm:manage", firm.id);
   const canEditProfile = canManage || ctx.has("firms:edit");
   const canEditFees = ctx.has("services:manage", firm.id);
@@ -56,6 +59,18 @@ export default async function SettingsPage({ params }: PageProps<"/f/[firmSlug]/
             </ul>
             <p className="text-muted">Switching it on is the practice&apos;s decision under POPIA (operator agreement with Anthropic and the cross-border transfer basis).</p>
             {canManage ? <div><AiDraftingToggle slug={firm.slug} enabled={!!ai.enabled} /></div> : null}
+          </div>
+        </Panel>
+
+        <Panel id="reminders">
+          <PanelHeader title="Reminders" description="Sent once a day. Both are off until switched on here, so nothing goes to clients or staff without this practice's decision." />
+          <div className="flex flex-col gap-3 p-4 text-[13px]">
+            <p className="text-ink-2">
+              Client reminders: <strong className="text-ink">{reminders.settings.clientNudges ? `On, at most every ${reminders.settings.nudgeEveryDays} days` : "Off"}</strong>
+              {" · "}Team digest: <strong className="text-ink">{reminders.settings.staffDigest ? "On" : "Off"}</strong>
+              <span className="text-muted"> · last 7 days: {sentThisWeek("client_documents")} client reminders, {sentThisWeek("staff_digest")} digests{failedThisWeek ? `, ${failedThisWeek} failed` : ""}</span>
+            </p>
+            {reminders.canEdit ? <RemindersForm firmSlug={firm.slug} settings={reminders.settings} /> : <p className="text-muted">Only practice administrators can change these.</p>}
           </div>
         </Panel>
 

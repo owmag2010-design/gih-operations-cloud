@@ -11,6 +11,7 @@ import { createSavedView, deleteSavedView } from "@/server/modules/crm/views";
 import { addDepartment, addStage, moveStage, updateFirmPolicies, updateFirmProfile, updateStage } from "@/server/modules/org/firms";
 import { changeFirmRole, removeFirmMembership, updateMembershipDetails } from "@/server/modules/people/people";
 import { createService, updateService } from "@/server/modules/services/services";
+import { saveReminderSettings } from "@/server/modules/reminders/reminders";
 import {
   addProposalItem, approveProposal, createProposalFromLead, releaseProposal, removeProposalItem, renewLink, requestChanges,
   reviseProposal, submitForReview, updateProposal, updateProposalItem, withdrawProposal,
@@ -259,6 +260,23 @@ export async function updatePoliciesAction(slug: string, _: ActionResult | null,
     await updateFirmPolicies(ctx, firm.firmId, data(form));
     revalidatePath(`/f/${slug}/settings`);
     return { ok: true, message: "Policies saved." };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+export async function saveRemindersAction(slug: string, _: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { ctx, firm } = await requireFirm(slug);
+  try {
+    await saveReminderSettings(ctx, firm.firmId, {
+      clientNudges: form.get("clientNudges") === "on",
+      nudgeEveryDays: form.get("nudgeEveryDays"),
+      staffDigest: form.get("staffDigest") === "on",
+      deadlineWindowDays: form.get("deadlineWindowDays"),
+      expiryWindowDays: form.get("expiryWindowDays"),
+    });
+    revalidatePath(`/f/${slug}/settings`);
+    return { ok: true, message: "Reminders saved." };
   } catch (err) {
     return toActionError(err);
   }

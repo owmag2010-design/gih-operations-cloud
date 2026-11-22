@@ -225,6 +225,20 @@
       "when": 1795196334832,
       "tag": "0031_client_portal",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795199934832,
+      "tag": "0032_reminders",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795203534832,
+      "tag": "0033_reminders_security",
+      "breakpoints": true
     }
   ]
 }
