@@ -69,7 +69,7 @@
         { "key": "city", "label": "City or town", "required": true }
       ],
       "authorities": [],
-      "notes": "Starting draft for the Harare office and Mimshac matters. Currency set to USD as a placeholder: confirm whether practices bill in USD or ZWG. Authorities and holidays still to be added."
+      "notes": "Starting draft for the Harare office and Mimshac matters. Practices bill in USD (confirmed by Owen, 21 Nov 2026). Authorities and holidays still to be added."
     }
   ],
   "calendars": [

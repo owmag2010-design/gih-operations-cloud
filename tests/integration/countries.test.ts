@@ -260,4 +260,21 @@ describe("practice-by-country checks", () => {
     const edited = await saveSource(admin, src.id, { countryCode: "NZ", kind: "official_fees", title: "Immigration fees (updated)", url: "https://www.immigration.govt.nz", effectiveFrom: "2026-07-01" });
     expect(edited.status).toBe("draft");
   });
+
+  it("records Zimbabwe's confirmed USD billing once, as a new version, and every practice as AU-registered", async () => {
+    const [zw] = await owner.select().from(s.countryProfiles).where(eq(s.countryProfiles.code, "ZW"));
+    expect(zw.currency).toBe("USD");
+    expect(zw.notes).toContain("confirmed");
+    // A database seeded before the answer still has the placeholder: the seed replaces it once.
+    await owner.update(s.countryProfiles).set({ notes: "Currency set to USD as a placeholder: confirm USD or ZWG." }).where(eq(s.countryProfiles.id, zw.id));
+    await runSeed(owner, () => {});
+    await runSeed(owner, () => {});
+    const [after] = await owner.select().from(s.countryProfiles).where(eq(s.countryProfiles.id, zw.id));
+    expect(after.notes).toContain("confirmed");
+    expect(after.version).toBe(zw.version + 1);
+    const versions = await owner.select().from(s.countryProfileVersions).where(eq(s.countryProfileVersions.profileId, zw.id));
+    expect(versions.map((v) => v.reason)).toContain("Currency confirmed as USD (Owen, 21 Nov 2026)");
+    const fs = await owner.select({ c: s.firms.registeredCountry }).from(s.firms);
+    expect(fs.every((f) => f.c === "AU")).toBe(true);
+  });
 });
