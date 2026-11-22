@@ -274,6 +274,10 @@ export async function saveRemindersAction(slug: string, _: ActionResult | null, 
       staffDigest: form.get("staffDigest") === "on",
       deadlineWindowDays: form.get("deadlineWindowDays"),
       expiryWindowDays: form.get("expiryWindowDays"),
+      overdueTasks: form.get("overdueTasks") === "on",
+      overdueTaskAfterDays: form.get("overdueTaskAfterDays"),
+      renewBeforeExpiry: form.get("renewBeforeExpiry") === "on",
+      renewDaysBefore: form.get("renewDaysBefore"),
     });
     revalidatePath(`/f/${slug}/settings`);
     return { ok: true, message: "Reminders saved." };

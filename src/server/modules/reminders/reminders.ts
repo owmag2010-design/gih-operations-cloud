@@ -6,7 +6,7 @@ import { audit } from "../../audit";
 import { decrypt } from "../../auth/crypto";
 import { db, withScope, type Scope, type Tx } from "../../db/client";
 import {
-  clients, documentRequests, firmMemberships, firms, matterDates, matterPeople, matters, portalAccess, reminderLog, reminderSettings, roles, users,
+  activities, clients, documentRequestEvents, documentRequests, firmMemberships, firms, matterDates, matterPeople, matters, portalAccess, reminderLog, reminderSettings, roles, tasks, users,
 } from "../../db/schema";
 import { env } from "../../env";
 import { AccessDeniedError } from "../../errors";
@@ -30,10 +30,18 @@ export type ReminderSettings = {
   staffDigest: boolean;
   deadlineWindowDays: number;
   expiryWindowDays: number;
+  overdueTasks: boolean;
+  overdueTaskAfterDays: number;
+  renewBeforeExpiry: boolean;
+  renewDaysBefore: number;
+  updatedById: string | null;
   updatedAt: Date | null;
 };
 
-export const DEFAULT_SETTINGS: ReminderSettings = { clientNudges: false, nudgeEveryDays: 7, staffDigest: false, deadlineWindowDays: 7, expiryWindowDays: 90, updatedAt: null };
+export const DEFAULT_SETTINGS: ReminderSettings = {
+  clientNudges: false, nudgeEveryDays: 7, staffDigest: false, deadlineWindowDays: 7, expiryWindowDays: 90,
+  overdueTasks: false, overdueTaskAfterDays: 3, renewBeforeExpiry: false, renewDaysBefore: 60, updatedById: null, updatedAt: null,
+};
 
 const settingsSchema = z.object({
   clientNudges: z.boolean(),
@@ -41,6 +49,10 @@ const settingsSchema = z.object({
   staffDigest: z.boolean(),
   deadlineWindowDays: z.coerce.number().int().min(1).max(60, "Look at most 60 days ahead for deadlines"),
   expiryWindowDays: z.coerce.number().int().min(14, "Look at least 14 days ahead for expiring documents").max(365),
+  overdueTasks: z.boolean().default(false),
+  overdueTaskAfterDays: z.coerce.number().int().min(1, "At least 1 day").max(60, "At most 60 days").default(3),
+  renewBeforeExpiry: z.boolean().default(false),
+  renewDaysBefore: z.coerce.number().int().min(14, "At least 14 days before").max(365, "At most 365 days before").default(60),
 });
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -49,7 +61,10 @@ const addDays = (isoDate: string, n: number) => iso(new Date(Date.parse(`${isoDa
 async function readSettings(tx: Tx, firmId: string): Promise<ReminderSettings> {
   const [row] = await tx.select().from(reminderSettings).where(eq(reminderSettings.firmId, firmId));
   return row
-    ? { clientNudges: row.clientNudges, nudgeEveryDays: row.nudgeEveryDays, staffDigest: row.staffDigest, deadlineWindowDays: row.deadlineWindowDays, expiryWindowDays: row.expiryWindowDays, updatedAt: row.updatedAt }
+    ? {
+        clientNudges: row.clientNudges, nudgeEveryDays: row.nudgeEveryDays, staffDigest: row.staffDigest, deadlineWindowDays: row.deadlineWindowDays, expiryWindowDays: row.expiryWindowDays,
+        overdueTasks: row.overdueTasks, overdueTaskAfterDays: row.overdueTaskAfterDays, renewBeforeExpiry: row.renewBeforeExpiry, renewDaysBefore: row.renewDaysBefore, updatedById: row.updatedById, updatedAt: row.updatedAt,
+      }
     : DEFAULT_SETTINGS;
 }
 
@@ -84,6 +99,10 @@ export async function saveReminderSettings(ctx: AccessContext, firmId: string, r
     if (before.nudgeEveryDays !== input.nudgeEveryDays) changes.push(`client reminders every ${input.nudgeEveryDays} days`);
     if (before.deadlineWindowDays !== input.deadlineWindowDays) changes.push(`deadlines ${input.deadlineWindowDays} days ahead`);
     if (before.expiryWindowDays !== input.expiryWindowDays) changes.push(`expiring documents ${input.expiryWindowDays} days ahead`);
+    if (before.overdueTasks !== input.overdueTasks) changes.push(`tasks for overdue documents ${input.overdueTasks ? "on" : "off"}`);
+    if (before.overdueTaskAfterDays !== input.overdueTaskAfterDays) changes.push(`overdue task after ${input.overdueTaskAfterDays} days`);
+    if (before.renewBeforeExpiry !== input.renewBeforeExpiry) changes.push(`renewal requests ${input.renewBeforeExpiry ? "on" : "off"}`);
+    if (before.renewDaysBefore !== input.renewDaysBefore) changes.push(`renewals ${input.renewDaysBefore} days before expiry`);
     await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId, action: "reminders.settings", entityType: "firm", entityId: firmId, summary: `Reminders: ${changes.join(", ") || "saved, no changes"}`, ip: ctx.ip }, tx);
     return input;
   });
@@ -225,6 +244,91 @@ export async function planStaffDigests(tx: Tx, firmId: string, settings: Reminde
   return out;
 }
 
+/* ───────────── automation rules ───────────── */
+
+/** Required client documents overdue by the practice's number of days, on open matters, without a task yet. */
+export async function planOverdueTasks(tx: Tx, firmId: string, settings: ReminderSettings, today: string) {
+  const cutoff = addDays(today, -settings.overdueTaskAfterDays);
+  const rows = await tx
+    .select({
+      requestId: documentRequests.id, label: documentRequests.label, dueOn: documentRequests.dueOn,
+      matterId: matters.id, matterRef: matters.ref, clientId: matters.clientId, assigneeId: sql<string | null>`coalesce(${matters.caseManagerId}, ${matters.consultantId})`,
+    })
+    .from(documentRequests)
+    .innerJoin(matters, eq(matters.id, documentRequests.matterId))
+    .where(and(
+      eq(documentRequests.firmId, firmId), isNull(matters.closedAt), eq(documentRequests.required, true),
+      inArray(documentRequests.status, ["requested", "rejected"]), lte(documentRequests.dueOn, cutoff),
+      sql`not exists (select 1 from reminder_log l where l.firm_id = ${firmId} and l.dedupe_key = 'task:' || ${documentRequests.id}::text)`,
+    ))
+    .orderBy(asc(documentRequests.dueOn));
+  return rows.map((r) => ({ ...r, dueOn: r.dueOn! }));
+}
+
+/** Accepted documents with a tracked expiry inside the practice's window, on open matters, not yet renewed. */
+export async function planRenewals(tx: Tx, firmId: string, settings: ReminderSettings, today: string) {
+  const until = addDays(today, settings.renewDaysBefore);
+  const rows = await tx
+    .select({ r: documentRequests, matterRef: matters.ref, clientId: matters.clientId })
+    .from(documentRequests)
+    .innerJoin(matters, eq(matters.id, documentRequests.matterId))
+    .where(and(
+      eq(documentRequests.firmId, firmId), isNull(matters.closedAt), eq(documentRequests.status, "accepted"),
+      eq(documentRequests.tracksExpiry, true), lte(documentRequests.expiresOn, until),
+      sql`not exists (select 1 from reminder_log l where l.firm_id = ${firmId} and l.dedupe_key = 'renew:' || ${documentRequests.id}::text)`,
+      // Not if the same document for the same person is already open again (asked for by hand).
+      sql`not exists (select 1 from document_requests o where o.matter_id = ${documentRequests.matterId} and o.id <> ${documentRequests.id}
+            and o.label = ${documentRequests.label} and o.person_id is not distinct from ${documentRequests.personId}
+            and o.status in ('requested', 'rejected', 'received', 'under_review') )`,
+    ))
+    .orderBy(asc(documentRequests.expiresOn));
+  return rows.map((x) => ({ ...x.r, expiresOn: x.r.expiresOn!, matterRef: x.matterRef, clientId: x.clientId }));
+}
+
+/** Run the switched-on rules for one practice. Each item is claimed, acted on and logged in one transaction. */
+async function runAutomation(scope: Scope, firmId: string, settings: ReminderSettings, today: string) {
+  const out = { tasks: 0, renewals: 0 };
+  const creator = settings.updatedById;
+  if (settings.overdueTasks && creator) {
+    const due = await withScope(scope, (tx) => planOverdueTasks(tx, firmId, settings, today));
+    for (const d of due) {
+      await withScope(scope, async (tx) => {
+        const [claimed] = await tx.insert(reminderLog).values({ firmId, kind: "overdue_task", matterId: d.matterId, userId: d.assigneeId, dedupeKey: `task:${d.requestId}`, items: 1, status: "done" }).onConflictDoNothing().returning({ id: reminderLog.id });
+        if (!claimed) return;
+        await tx.insert(tasks).values({
+          orgId: scope.orgId, firmId, matterId: d.matterId, clientId: d.clientId, assigneeId: d.assigneeId, createdById: creator,
+          title: `Chase ${d.label} · ${d.matterRef}`, priority: "high", dueAt: new Date(`${today}T00:00:00Z`), allDay: true,
+          description: `Created automatically: the client's ${d.label} was due on ${fmt(d.dueOn)} and hasn't arrived. Turn this rule off in Settings › Reminders.`,
+        });
+        out.tasks++;
+      });
+    }
+  }
+  if (settings.renewBeforeExpiry) {
+    const due = await withScope(scope, (tx) => planRenewals(tx, firmId, settings, today));
+    for (const d of due) {
+      await withScope(scope, async (tx) => {
+        const [claimed] = await tx.insert(reminderLog).values({ firmId, kind: "expiry_renewal", matterId: d.matterId, dedupeKey: `renew:${d.id}`, items: 1, status: "done" }).onConflictDoNothing().returning({ id: reminderLog.id });
+        if (!claimed) return;
+        const [{ max }] = await tx.select({ max: sql<number>`coalesce(max(${documentRequests.position}), -1)::int` }).from(documentRequests).where(eq(documentRequests.matterId, d.matterId));
+        const twoWeeksBefore = addDays(d.expiresOn, -14);
+        const inAWeek = addDays(today, 7);
+        const [req] = await tx.insert(documentRequests).values({
+          firmId, matterId: d.matterId, checklistId: d.checklistId, templateItemId: d.templateItemId, personId: d.personId,
+          label: d.label, guidance: `The copy we have expires on ${fmt(d.expiresOn)}. Please send a renewed one.${d.guidance ? ` ${d.guidance}` : ""}`,
+          required: d.required, tracksExpiry: true, clientVisible: d.clientVisible, status: "requested",
+          dueOn: twoWeeksBefore > inAWeek ? twoWeeksBefore : inAWeek, position: max + 1, createdById: null,
+        }).returning({ id: documentRequests.id });
+        const note = `Requested automatically: the accepted copy expires on ${fmt(d.expiresOn)}.`;
+        await tx.insert(documentRequestEvents).values({ firmId, matterId: d.matterId, requestId: req.id, fromStatus: null, toStatus: "requested", note, actorId: null });
+        await tx.insert(activities).values({ firmId, clientId: d.clientId, matterId: d.matterId, type: "matter", body: `Requested a renewed ${d.label} (the current copy expires on ${fmt(d.expiresOn)})`, data: { requestId: req.id, renews: d.id, automatic: true }, actorId: null });
+        out.renewals++;
+      });
+    }
+  }
+  return out;
+}
+
 /* ───────────── sending (the daily job) ───────────── */
 
 const systemScope = (orgId: string, firmId: string): Scope => ({ orgId, userId: null, firmIds: [firmId], matterAdminFirms: [firmId] });
@@ -270,16 +374,24 @@ export function staffDigestEmail(d: StaffDigest, firmName: string) {
   return staffAlertEmail({ heading: `Your day at ${firmName}`, lines: [`Hello ${d.name.split(" ")[0]}, here's what needs you on your matters.`, "", ...lines], actionLabel: "Open My day", actionUrl: `${env().APP_URL}/today` });
 }
 
-export type RunReport = { firmId: string; clientSent: number; digestsSent: number; failed: number; skipped: number };
+export type RunReport = { firmId: string; tasks: number; renewals: number; clientSent: number; digestsSent: number; failed: number; skipped: number };
 
 /** One practice. `today` is a UTC date (YYYY-MM-DD); keys use it, so a second run that day sends nothing new. */
 export async function runFirmReminders(orgId: string, firmId: string, today = iso(new Date())): Promise<RunReport> {
-  const report: RunReport = { firmId, clientSent: 0, digestsSent: 0, failed: 0, skipped: 0 };
+  const report: RunReport = { firmId, tasks: 0, renewals: 0, clientSent: 0, digestsSent: 0, failed: 0, skipped: 0 };
   const scope = systemScope(orgId, firmId);
-  const plan = await withScope(scope, async (tx) => {
-    const settings = await readSettings(tx, firmId);
+  const pre = await withScope(scope, async (tx) => {
     const [firm] = await tx.select({ name: firms.tradingName, slug: firms.slug, status: firms.status }).from(firms).where(eq(firms.id, firmId));
-    if (!firm || firm.status !== "active") return null;
+    return firm && firm.status === "active" ? { firm, settings: await readSettings(tx, firmId) } : null;
+  });
+  if (!pre) return report;
+  // Rules first, so a renewal requested today is in today's digest.
+  const auto = await runAutomation(scope, firmId, pre.settings, today);
+  report.tasks = auto.tasks;
+  report.renewals = auto.renewals;
+  const plan = await withScope(scope, async (tx) => {
+    const settings = pre.settings;
+    const firm = pre.firm;
     return {
       firm,
       nudges: settings.clientNudges ? await planClientNudges(tx, firmId, settings, today) : [],

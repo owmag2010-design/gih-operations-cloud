@@ -239,6 +239,20 @@
       "when": 1795203534832,
       "tag": "0033_reminders_security",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795207134832,
+      "tag": "0034_automation_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1795210734832,
+      "tag": "0035_automation_rules_security",
+      "breakpoints": true
     }
   ]
 }
