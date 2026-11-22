@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AdHocRequestForm, ApplyChecklistForm, RequestItem } from "./requests";
 import { CalendarPlus, Lock, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -167,6 +168,29 @@ export default async function MatterPage({ params, searchParams }: PageProps<"/f
           <Panel id="tasks">
             <PanelHeader title="Tasks" actions={<Link href={`/tasks?view=team`} className="text-[13px] text-ink-2 hover:text-ink">All tasks →</Link>} />
             <TaskList tasks={tasks} options={options} meId={ctx.user.id} showPractice={false} empty="No tasks on this matter. Add one, or set up task templates by stage in Settings." />
+          </Panel>
+
+          <Panel id="requests">
+            <PanelHeader
+              title="Documents from the client"
+              description={view.requests.requests.length ? `${view.requests.outstandingRequired} required still outstanding · ${view.requests.awaitingReview} waiting for review. Received, reviewed and accepted are kept apart.` : "Requests for the client's documents, from a checklist for this destination or one at a time."}
+            />
+            {view.requests.checklists.length ? (
+              <p className="border-b border-hairline px-4 py-2 text-xs text-muted">From: {view.requests.checklists.map((c) => `${c.name} v${c.version}${c.status === "published" ? "" : " (a newer version exists)"}`).join(" · ")}</p>
+            ) : null}
+            {canEdit ? <ApplyChecklistForm slug={firm.slug} matterId={matter.id} options={view.checklistsAvailable} /> : null}
+            {canEdit && !view.checklistsAvailable.length && !view.requests.checklists.length ? (
+              <p className="border-b border-hairline px-4 py-2 text-xs text-muted">{matter.jurisdiction ? `No published checklist for ${countryName(matter.jurisdiction)}${service ? ` or ${service.name}` : ""} yet.` : "Set the destination country to see its checklists."} {ctx.has("firm:manage", firm.firmId) ? <Link className="underline" href={`${base}/settings/matters#checklists`}>Manage checklists</Link> : null}</p>
+            ) : null}
+            {view.requests.requests.length ? (
+              <ul className="divide-y divide-hairline">
+                {view.requests.requests.map((r) => (
+                  <RequestItem key={r.id} slug={firm.slug} matterId={matter.id} files={view.files} canEdit={canEdit} canApprove={ctx.has("documents:approve", firm.firmId)}
+                    r={{ ...r, history: r.history.map((h) => ({ id: h.id, toStatus: h.toStatus, note: h.note, actor: h.actor, createdAt: h.createdAt.toISOString() })) }} />
+                ))}
+              </ul>
+            ) : null}
+            {canEdit ? <AdHocRequestForm slug={firm.slug} matterId={matter.id} people={peopleNames} /> : null}
           </Panel>
 
           <DocumentsPanel ctx={ctx} firmId={firm.firmId} slug={firm.slug} link={{ matterId: matter.id }} />

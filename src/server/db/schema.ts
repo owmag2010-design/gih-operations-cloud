@@ -1015,6 +1015,8 @@ export const matterStages = pgTable(
     position: integer("position").notNull(),
     category: matterStageCategory("category").notNull().default("active"),
     isActive: boolean("is_active").notNull().default(true),
+    /** A matter can't move into this stage while required document requests are outstanding. */
+    requiresDocuments: boolean("requires_documents").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [index("matter_stages_firm_idx").on(t.firmId, t.position)],
@@ -1847,4 +1849,121 @@ export const entityCountryCapabilities = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex("entity_country_capabilities_uq").on(t.firmId, t.countryCode, t.area)],
+);
+
+/* ───────────────────── Document checklists and requests ───────────────────── */
+/*
+ * A practice keeps checklist templates per destination country and (optionally)
+ * service. Templates are versioned: a published version never changes, and a
+ * matter keeps the version it was given. Each checklist item becomes a document
+ * request on the matter, which moves through requested → received → under
+ * review → accepted (or rejected, which asks for a replacement), or waived.
+ */
+
+export const checklistStatus = pgEnum("checklist_template_status", ["draft", "published", "retired"]);
+export const checklistAppliesTo = pgEnum("checklist_applies_to", ["matter", "main_applicant", "each_applicant", "partner", "dependants", "sponsor"]);
+export const documentRequestStatus = pgEnum("document_request_status", ["requested", "received", "under_review", "accepted", "rejected", "waived"]);
+
+export const checklistTemplates = pgTable(
+  "checklist_templates",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    /** Same for every version of one checklist. */
+    familyId: uuid("family_id").notNull(),
+    version: integer("version").notNull(),
+    name: text("name").notNull(),
+    countryCode: text("country_code").notNull(),
+    serviceId: uuid("service_id"),
+    status: checklistStatus("status").notNull().default("draft"),
+    /** The authoritative source this checklist was built from (org-level register). */
+    sourceId: uuid("source_id").references(() => jurisdictionSources.id, { onDelete: "set null" }),
+    sourceNote: text("source_note"),
+    changeNote: text("change_note"),
+    publishedById: uuid("published_by_id").references(() => users.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("checklist_templates_family_version_uq").on(t.familyId, t.version), index("checklist_templates_firm_idx").on(t.firmId, t.countryCode)],
+);
+
+export const checklistTemplateItems = pgTable(
+  "checklist_template_items",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    templateId: uuid("template_id").notNull(),
+    position: integer("position").notNull(),
+    label: text("label").notNull(),
+    guidance: text("guidance"),
+    appliesTo: checklistAppliesTo("applies_to").notNull().default("main_applicant"),
+    required: boolean("required").notNull().default(true),
+    tracksExpiry: boolean("tracks_expiry").notNull().default(false),
+    clientVisible: boolean("client_visible").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index("checklist_template_items_template_idx").on(t.templateId, t.position)],
+);
+
+/** A checklist version applied to a matter. */
+export const matterChecklists = pgTable(
+  "matter_checklists",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    matterId: uuid("matter_id").notNull(),
+    templateId: uuid("template_id").notNull(),
+    appliedById: uuid("applied_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("matter_checklists_matter_template_uq").on(t.matterId, t.templateId)],
+);
+
+export const documentRequests = pgTable(
+  "document_requests",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    matterId: uuid("matter_id").notNull(),
+    checklistId: uuid("checklist_id"),
+    templateItemId: uuid("template_item_id"),
+    personId: uuid("person_id"),
+    label: text("label").notNull(),
+    guidance: text("guidance"),
+    required: boolean("required").notNull().default(true),
+    tracksExpiry: boolean("tracks_expiry").notNull().default(false),
+    clientVisible: boolean("client_visible").notNull().default(true),
+    status: documentRequestStatus("status").notNull().default("requested"),
+    dueOn: date("due_on"),
+    fileId: uuid("file_id"),
+    expiresOn: date("expires_on"),
+    reviewerId: uuid("reviewer_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    note: text("note"),
+    position: integer("position").notNull().default(0),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("document_requests_matter_idx").on(t.matterId, t.position), index("document_requests_firm_status_idx").on(t.firmId, t.status)],
+);
+
+/** Every status change on a request: who, when, why. Append-only. */
+export const documentRequestEvents = pgTable(
+  "document_request_events",
+  {
+    id: id(),
+    firmId: uuid("firm_id").notNull().references(() => firms.id),
+    matterId: uuid("matter_id").notNull(),
+    requestId: uuid("request_id").notNull(),
+    fromStatus: documentRequestStatus("from_status"),
+    toStatus: documentRequestStatus("to_status").notNull(),
+    fileId: uuid("file_id"),
+    note: text("note"),
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("document_request_events_request_idx").on(t.requestId, t.createdAt)],
 );

@@ -5,6 +5,8 @@ import type { AccessContext } from "../../access/context";
 import { audit } from "../../audit";
 import { withScope, type Tx } from "../../db/client";
 import {
+  matterChecklists,
+  documentFiles,
   businessCalendars,
   offices,
   firmOffices,
@@ -29,6 +31,7 @@ import { nextRef } from "../refs";
 import { applyTaskTemplates } from "../tasks/tasks";
 import { addBusinessDays, addCalendarDays, isIsoDate } from "./dates";
 import { countryStatuses, verifiedHolidays } from "../countries/countries";
+import { applicableChecklists, matterRequests, outstandingRequired } from "../checklists/checklists";
 
 /* ───────── Access ───────── */
 
@@ -121,6 +124,7 @@ const stageSchema = z.object({
   name: z.string().trim().min(2, "Name the stage.").max(60),
   category: z.enum(["opening", "active", "submitted", "closed"]),
   serviceId: optionalUuid,
+  requiresDocuments: z.union([z.boolean(), z.literal("on"), z.literal("off"), z.literal("")]).optional().transform((v) => v === true || v === "on"),
 });
 
 export async function addMatterStage(ctx: AccessContext, firmId: string, raw: unknown) {
@@ -134,7 +138,7 @@ export async function addMatterStage(ctx: AccessContext, firmId: string, raw: un
     }
     const [{ n }] = await tx.select({ n: count() }).from(matterStages).where(and(eq(matterStages.firmId, firmId), serviceId ? eq(matterStages.serviceId, serviceId) : isNull(matterStages.serviceId)));
     const key = `${input.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || "stage"}_${Date.now().toString(36)}`;
-    const [stage] = await tx.insert(matterStages).values({ firmId, serviceId, key, name: input.name, category: input.category, position: Number(n) }).returning();
+    const [stage] = await tx.insert(matterStages).values({ firmId, serviceId, key, name: input.name, category: input.category, requiresDocuments: input.requiresDocuments, position: Number(n) }).returning();
     await audit({ orgId: ctx.orgId, actorId: ctx.user.id, firmId, action: "matter_stage.created", entityType: "matter_stage", entityId: stage.id, summary: `Added matter stage ${stage.name}`, ip: ctx.ip }, tx);
     return stage;
   });
@@ -148,7 +152,7 @@ export async function updateMatterStage(ctx: AccessContext, firmId: string, stag
     const isActive = input.isActive === true || input.isActive === "on";
     const [stage] = await tx
       .update(matterStages)
-      .set({ name: input.name, category: input.category, isActive })
+      .set({ name: input.name, category: input.category, isActive, requiresDocuments: input.requiresDocuments })
       .where(and(eq(matterStages.id, stageId), eq(matterStages.firmId, firmId)))
       .returning();
     if (!stage) throw new NotFoundError("Stage");
@@ -258,8 +262,13 @@ export async function getMatter(ctx: AccessContext, firmId: string, id: string) 
     const rules = await tx.select().from(deadlineRules).where(and(eq(deadlineRules.firmId, firmId), eq(deadlineRules.isActive, true))).orderBy(asc(deadlineRules.name));
     const officeRows = await practiceOffices(tx, firmId);
     const statuses = await countryStatuses(tx, ctx.orgId);
+    const documentsView = await matterRequests(tx, matter.id);
+    const appliedIds = new Set((await tx.select({ id: matterChecklists.templateId }).from(matterChecklists).where(eq(matterChecklists.matterId, matter.id))).map((r) => r.id));
+    const checklistsAvailable = (await applicableChecklists(tx, firmId, matter)).filter((c) => !appliedIds.has(c.id));
+    const files = await tx.select({ id: documentFiles.id, filename: documentFiles.filename }).from(documentFiles).where(eq(documentFiles.matterId, matter.id)).orderBy(desc(documentFiles.createdAt));
     return {
       matter, client, stage, stages, service, proposal, people, events, timeline, offices: officeRows,
+      requests: documentsView, checklistsAvailable, files,
       destinationStatus: matter.jurisdiction ? (statuses.get(matter.jurisdiction) ?? null) : null,
       facts: facts.map((r) => ({ ...r.f, recordedBy: r.recordedBy, verifiedBy: r.verifiedBy })),
       dates: dates.map((r) => ({ ...r.d, ruleName: r.ruleName, ruleSource: r.ruleSource, reviewedBy: r.reviewedBy })),
@@ -392,6 +401,12 @@ export async function changeMatterStage(ctx: AccessContext, firmId: string, id: 
     const next = stages.find((s) => s.id === stageId);
     if (!next) throw new ValidationError("Choose a stage for this matter.");
     if (next.id === m.stageId) return { matter: m, stage: next, tasksCreated: 0 };
+    if (next.requiresDocuments) {
+      const missing = await outstandingRequired(tx, m.id);
+      if (missing.length) {
+        throw new ValidationError(`"${next.name}" needs every required document accepted or waived first. Still outstanding: ${missing.slice(0, 5).join(", ")}${missing.length > 5 ? ` and ${missing.length - 5} more` : ""}.`);
+      }
+    }
     const from = (await tx.select({ name: matterStages.name }).from(matterStages).where(eq(matterStages.id, m.stageId)))[0]?.name;
     const closing = next.category === "closed";
     const [updated] = await tx.update(matters).set({ stageId: next.id, closedAt: closing ? new Date() : null, updatedAt: new Date() }).where(eq(matters.id, m.id)).returning();

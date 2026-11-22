@@ -204,6 +204,20 @@
       "when": 1795185534832,
       "tag": "0028_countries_security",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1795189134832,
+      "tag": "0029_checklists",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1795192734832,
+      "tag": "0030_checklists_security",
+      "breakpoints": true
     }
   ]
 }

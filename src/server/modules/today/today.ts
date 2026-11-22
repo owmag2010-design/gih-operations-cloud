@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, count, desc, eq, inArray, isNull, lt, lte, min, or, sql } from "drizzle-orm";
 import type { AccessContext } from "../../access/context";
 import { withScope } from "../../db/client";
-import { intakeItems, leads, matterDates, matters, matterStages, pipelineStages, proposals } from "../../db/schema";
+import { documentRequests, intakeItems, leads, matterDates, matters, matterStages, pipelineStages, proposals } from "../../db/schema";
 import { inboxReach } from "../email/access";
 import { listInbox, unreadCount } from "../email/mail";
 import { canViewMatters, matterVisibility } from "../matters/matters";
@@ -31,6 +31,8 @@ export type MyDay = {
   tasks: { id: string; title: string; dueAt: Date | null; allDay: boolean; priority: string; overdue: boolean; reminded: boolean; firm: DayPractice | null; matterId: string | null; matterRef: string | null }[];
   /** Deadlines and expiry dates in the next 14 days on matters I'm on the team for. */
   deadlines: { id: string; label: string; kind: string; dueOn: string; matterId: string; matterRef: string; firm: DayPractice }[] | null;
+  /** Client documents on my matters: overdue requests, ones waiting for my review, and accepted documents expiring within 90 days. */
+  documents: { id: string; label: string; kind: "overdue" | "review" | "expiring"; date: string | null; matterId: string; matterRef: string; firm: DayPractice }[] | null;
 };
 
 function endOfTomorrow(now = new Date()) {
@@ -168,6 +170,36 @@ export async function myDay(ctx: AccessContext): Promise<MyDay> {
   );
   deadlines.sort((a, b) => a.dueOn.localeCompare(b.dueOn));
 
+  // Client documents on matters I'm on the team for
+  const documents: NonNullable<MyDay["documents"]> = [];
+  const todayIso = now.toISOString().slice(0, 10);
+  const in90 = new Date(now.getTime() + 90 * 864e5).toISOString().slice(0, 10);
+  await Promise.all(
+    matterFirms.map((f) =>
+      withScope(ctx.scopeFor(f.firmId), async (tx) => {
+        const mine = or(eq(matters.caseManagerId, ctx.user.id), eq(matters.consultantId, ctx.user.id), sql`exists (select 1 from matter_members mm where mm.matter_id = ${matters.id} and mm.user_id = ${ctx.user.id})`);
+        const reviewer = ctx.has("documents:approve", f.firmId);
+        const rows = await tx
+          .select({ id: documentRequests.id, label: documentRequests.label, status: documentRequests.status, dueOn: documentRequests.dueOn, expiresOn: documentRequests.expiresOn, matterId: matters.id, matterRef: matters.ref })
+          .from(documentRequests)
+          .innerJoin(matters, eq(matters.id, documentRequests.matterId))
+          .where(and(
+            ...matterVisibility(ctx, f.firmId), mine,
+            or(
+              and(lt(documentRequests.dueOn, todayIso), sql`${documentRequests.status} in ('requested', 'rejected')`),
+              reviewer ? sql`${documentRequests.status} in ('received', 'under_review')` : sql`false`,
+              and(eq(documentRequests.status, "accepted"), lte(documentRequests.expiresOn, in90)),
+            ),
+          ))
+          .limit(30);
+        for (const r of rows) {
+          const kind = r.status === "accepted" ? "expiring" : r.status === "received" || r.status === "under_review" ? "review" : "overdue";
+          documents.push({ id: r.id, label: r.label, kind, date: kind === "expiring" ? r.expiresOn : kind === "overdue" ? r.dueOn : null, matterId: r.matterId, matterRef: r.matterRef, firm: f });
+        }
+      }),
+    ),
+  );
+
   // My tasks
   const firmById = new Map(firmsList.map((f) => [f.firmId, f]));
   const myTasks = (await listTasks(ctx, { view: "mine", status: "open" }).catch(() => []))
@@ -187,5 +219,6 @@ export async function myDay(ctx: AccessContext): Promise<MyDay> {
     practices: firmsList.map((f) => ({ ...f, ...counts.get(f.firmId)! })),
     tasks: myTasks,
     deadlines: matterFirms.length ? deadlines.slice(0, 10) : null,
+    documents: matterFirms.length ? documents.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "")).slice(0, 12) : null,
   };
 }

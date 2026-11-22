@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LocalTime } from "@/components/ui/forms";
 import { Badge, EmptyState, PageHeader, Panel, PanelHeader } from "@/components/ui/primitives";
+import { listChecklistTemplates } from "@/server/modules/checklists/checklists";
 import { listCalendarsFor, listCountries } from "@/server/modules/countries/countries";
+import { listCatalogue } from "@/server/modules/services/services";
+import { NewChecklistForm } from "../checklists/client";
 import { listDeadlineRules, listStageSets } from "@/server/modules/matters/matters";
 import { listTaskTemplates } from "@/server/modules/tasks/tasks";
 import { requireFirm } from "@/server/next/session";
@@ -19,6 +22,7 @@ export default async function MatterSettingsPage({ params }: PageProps<"/f/[firm
   const [{ stages, services }, templates, rules, countries, calendars] = await Promise.all([
     listStageSets(ctx, firm.firmId), listTaskTemplates(ctx, firm.firmId), listDeadlineRules(ctx, firm.firmId), listCountries(ctx), listCalendarsFor(ctx),
   ]);
+  const [checklists, catalogue] = await Promise.all([listChecklistTemplates(ctx, firm.firmId), listCatalogue(ctx, firm.firmId, { activeOnly: true })]);
   const defaults = stages.filter((s) => !s.serviceId);
   const byService = services.map((svc) => ({ svc, stages: stages.filter((s) => s.serviceId === svc.id) })).filter((x) => x.stages.length);
 
@@ -71,6 +75,22 @@ export default async function MatterSettingsPage({ params }: PageProps<"/f/[firm
             </ul>
           ) : <EmptyState title="No task templates yet">Add the tasks your team does on every matter, such as sending the welcome pack or requesting documents.</EmptyState>}
           {canManage ? <TaskTemplateForm slug={firm.slug} stages={stages.filter((s) => s.isActive).map((s) => ({ id: s.id, name: s.name, serviceName: s.serviceName }))} services={services} /> : null}
+        </Panel>
+
+        <Panel id="checklists">
+          <PanelHeader title="Document checklists" description="What to ask clients for, per destination country and service. Each version is fixed once published; a matter keeps the version it was given. Publishing needs the country to have been reviewed by the Hub." />
+          {checklists.length ? (
+            <ul className="divide-y divide-hairline">
+              {checklists.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                  <Link href={`/f/${firm.slug}/settings/checklists/${c.id}`} className="min-w-0 flex-1 text-sm font-medium text-ink hover:underline">{c.name} <span className="font-normal text-muted">v{c.version}</span></Link>
+                  <span className="text-xs text-muted">{c.countryCode}{c.serviceName ? ` · ${c.serviceName}` : " · any service"} · {c.itemCount} document{c.itemCount === 1 ? "" : "s"} · on {c.inUse} matter{c.inUse === 1 ? "" : "s"}</span>
+                  <Badge tone={c.status === "published" ? "ok" : c.status === "retired" ? "outline" : "warn"}>{c.status === "published" ? "Published" : c.status === "retired" ? "Retired" : "Draft"}</Badge>
+                </li>
+              ))}
+            </ul>
+          ) : <EmptyState title="No checklists yet">Start one for each destination country your practice serves. Nothing is pre-loaded: checklists come from the practice and its sources.</EmptyState>}
+          {canManage ? <NewChecklistForm slug={firm.slug} countries={countries.filter((c) => c.status !== "retired").map((c) => ({ code: c.code, name: c.name, status: c.status }))} services={catalogue.map((x) => ({ id: x.id, name: x.name, jurisdiction: x.jurisdiction }))} /> : null}
         </Panel>
 
         <Panel id="rules">

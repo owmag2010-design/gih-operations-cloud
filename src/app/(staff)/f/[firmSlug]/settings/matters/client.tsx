@@ -17,7 +17,7 @@ function useAct() {
   return [pending, (fn: () => Promise<ActionResult>) => start(async () => { const r = await fn(); if (r.ok) toast.success(r.message); else toast.error(r.error); })] as const;
 }
 
-type Stage = { id: string; name: string; category: string; isActive: boolean; serviceId: string | null };
+type Stage = { id: string; name: string; category: string; isActive: boolean; serviceId: string | null; requiresDocuments: boolean };
 
 export function MatterStageEditor({ slug, stages, serviceId, canManage }: { slug: string; stages: Stage[]; serviceId: string | null; canManage: boolean }) {
   const [pending, run] = useAct();
@@ -44,6 +44,7 @@ export function MatterStageEditor({ slug, stages, serviceId, canManage }: { slug
           <input type="hidden" name="serviceId" value={serviceId ?? ""} />
           <Field label="New stage" name="name" idPrefix={`ms-${serviceId ?? "d"}`} error={fieldError(addState, "name")}><Input required maxLength={60} className="w-56" /></Field>
           <Field label="Kind" name="category" idPrefix={`ms-${serviceId ?? "d"}`}><Select defaultValue="active" className="w-40">{Object.entries(CATEGORY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
+          <label className="flex h-9 items-center gap-1.5 text-xs text-muted"><input type="checkbox" name="requiresDocuments" className="accent-[var(--accent)]" /> Needs required documents settled</label>
           <SubmitButton>Add stage</SubmitButton>
           <div className="basis-full"><ActionFeedback state={addState} /></div>
         </form>
@@ -59,6 +60,7 @@ function StageRow({ slug, stage }: { slug: string; stage: Stage }) {
       <label className="flex-1"><span className="sr-only">Stage name</span><Input name="name" defaultValue={stage.name} className="h-8 max-w-xs text-[13px]" required /></label>
       <label><span className="sr-only">Kind</span><Select name="category" defaultValue={stage.category} className="h-8 w-36 text-[13px]">{Object.entries(CATEGORY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></label>
       <label className="flex items-center gap-1.5 text-xs text-muted"><input type="checkbox" name="isActive" defaultChecked={stage.isActive} className="accent-[var(--accent)]" /> Active</label>
+      <label className="flex items-center gap-1.5 text-xs text-muted" title="A matter can't move into this stage while required documents are outstanding."><input type="checkbox" name="requiresDocuments" defaultChecked={stage.requiresDocuments} className="accent-[var(--accent)]" /> Needs documents</label>
       <SubmitButton size="sm" variant="secondary">Save</SubmitButton>
       {state && !state.ok ? <p role="alert" className="basis-full text-xs text-danger">{state.error}</p> : null}
     </form>
